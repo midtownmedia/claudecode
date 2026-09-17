@@ -117,6 +117,21 @@ export const RED_FLAGS = [
   },
 ];
 
+/**
+ * Drawing a day's doses in one go.
+ *
+ * For a protocol split across morning and evening, filling both syringes at
+ * once is ordinary practice - it halves the number of times the vial is
+ * punctured, which is the thing most likely to contaminate it.
+ */
+export const PRE_DRAWN = [
+  'Draw both doses at once, cap the second and put it in the fridge until the evening. One puncture a day is better for the vial than two.',
+  'Keep the cap on and do not let the needle touch anything between drawing and injecting.',
+  'Take it out a few minutes before you use it. Injecting straight from the fridge stings noticeably more.',
+  'If you pre-draw more than one compound, label every syringe. Two identical syringes holding different things is the single easiest way to give yourself the wrong one.',
+  'Same day only. This is for an evening dose you drew that morning, not for filling a week ahead.',
+];
+
 export const SHARP_SAFETY = [
   'A needle is single use. Reusing one blunts the tip, hurts more and pushes skin bacteria into the vial.',
   'Never share a needle, syringe or vial with anyone, for any reason.',

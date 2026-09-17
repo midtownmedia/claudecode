@@ -4,7 +4,7 @@ import { el, field, select, number, warnings, stat, fmtNum, banner } from '../ui
 import { syringeCard } from '../ui/syringe.js';
 import { PEPTIDES, peptide, sheetFor } from '../data/peptides.js';
 import { SYRINGES, syringe, bestSyringeFor } from '../data/syringes.js';
-import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, MAX_BAC_WATER_ML } from '../lib/calc.js';
+import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, splitDraw, MAX_BAC_WATER_ML } from '../lib/calc.js';
 import { checkDose, checkFirstDose, checkMeasurability } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
 
@@ -60,6 +60,9 @@ export function calculatorView(ctx) {
   const smaller = bestSyringeFor(calc.roundedUnits);
 
   const sheet = sheetFor(p.id);
+  const split = p.splitDose
+    ? splitDraw({ units: calc.roundedUnits, dose: calc.actualDose, parts: p.splitDose.parts })
+    : null;
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
@@ -151,6 +154,35 @@ export function calculatorView(ctx) {
             onclick: () => { st.diluentMl = better.diluentMl; ctx.render(); },
           }, 'use this')))
         : null),
+
+    (split
+      ? el('div', { class: 'card split-card' },
+        el('h3', {}, `If ${p.name} makes you feel sick`),
+        el('p', { class: 'lede' },
+          `${p.name} is commonly split to keep ${p.splitDose.reason} down. It is the same ` +
+          `${formatMass(calc.actualDose)} a day either way — just given in ${p.splitDose.parts} halves instead of one go.`),
+        el('div', { class: 'split-row' },
+          el('div', { class: 'split-half' },
+            el('div', { class: 'split-units' }, `${fmtNum(split.perPartUnits, 2)} units`),
+            el('div', { class: 'split-when' }, 'in the morning'),
+            el('div', { class: 'split-dose' }, formatMass(split.perPartDose))),
+          el('div', { class: 'split-plus' }, '+'),
+          el('div', { class: 'split-half' },
+            el('div', { class: 'split-units' }, `${fmtNum(split.perPartUnits, 2)} units`),
+            el('div', { class: 'split-when' }, 'again at night'),
+            el('div', { class: 'split-dose' }, formatMass(split.perPartDose)))),
+        el('div', { class: 'stats' },
+          stat('Whole dose', `${fmtNum(calc.roundedUnits, 2)} units`, formatMass(calc.actualDose)),
+          stat('Each half', `${fmtNum(split.perPartUnits, 2)} units`, formatMass(split.perPartDose)),
+          stat('Daily total', formatMass(split.totalDose), 'unchanged'),
+          stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial * split.parts : '--',
+            `${split.parts} halves a day`)),
+        banner('info',
+          'You can fill both syringes in one go and keep the evening one capped in the fridge — one puncture of the vial a day instead of two. Take it out a few minutes early so it is not fridge-cold.'),
+        split.exact
+          ? null
+          : banner('warn', `${fmtNum(calc.roundedUnits, 2)} units does not halve evenly, so each half is rounded to ${fmtNum(split.perPartUnits, 2)} units and the day comes to ${formatMass(split.totalDose)}.`))
+      : null),
 
     el('details', { class: 'card' },
       el('summary', {}, 'Show me the maths'),

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { costBreakdown, totalBurn, amortiseCycle, vialsPerCycle, spendSummary } from '../public/js/lib/cost.js';
+import { costBreakdown, totalBurn, amortiseCycle, vialsPerCycle, spendSummary, dailyTotal } from '../public/js/lib/cost.js';
 import { dosesPerWeek, nextDoseAt, titrationStatus, vialExpiry, vialDuration, BAC_WATER, STERILE_WATER_CAUTION } from '../public/js/lib/schedule.js';
 import { migrate, suggestSite, importJson, exportJson, DEFAULT_STATE, SITES } from '../public/js/lib/store.js';
 import { checkDose, checkEscalation, checkFirstDose } from '../public/js/lib/safety.js';
-import { doseToUnits, smallestMeasurableDose, MAX_BAC_WATER_ML } from '../public/js/lib/calc.js';
+import { doseToUnits, smallestMeasurableDose, splitDraw, MAX_BAC_WATER_ML } from '../public/js/lib/calc.js';
 import { peptide, PEPTIDES, sheetFor } from '../public/js/data/peptides.js';
 import { bestSyringeFor } from '../public/js/data/syringes.js';
 
@@ -254,4 +254,78 @@ test('the first-dose guard steps aside once a protocol is saved', () => {
   assert.match(checkFirstDose(4, p)[0].message, /If this is your first dose/);
   // And any established history silences it.
   assert.equal(checkFirstDose(4, p, { hasHistory: true }).length, 0);
+});
+
+test('splitting a daily dose changes nothing but the injection size', () => {
+  const cycle = { daysOn: 20, everyDays: 182.6 };
+  const arm = (dose, freqId) => {
+    const calc = doseToUnits({ strength: 50, diluentMl: 5, dose });
+    const b = costBreakdown({ vialPrice: 170, dosesPerVial: calc.dosesPerVial, freqId });
+    return {
+      daily: dailyTotal({ doseMg: dose, freqId }),
+      bottles: vialsPerCycle({ doseMg: dose, daysOn: cycle.daysOn, vialStrengthMg: 50, freqId }),
+      perDay: b.perDay,
+      perCycle: amortiseCycle({ perDay: b.perDay, cycle }).perCycle,
+    };
+  };
+  const whole = arm(5, 'qd');
+  const split = arm(2.5, 'bid');
+
+  // 5 mg a day either way, and the same two bottles and the same money.
+  close(whole.daily, 5);
+  close(split.daily, 5);
+  assert.equal(whole.bottles, 2);
+  assert.equal(split.bottles, 2);
+  close(whole.perDay, split.perDay);
+  close(whole.perCycle, split.perCycle);
+  close(whole.perCycle, 340);
+});
+
+test('a split course orders enough bottles', () => {
+  // The bug this guards: counting one dose a day when there are two.
+  assert.equal(vialsPerCycle({ doseMg: 2.5, daysOn: 20, vialStrengthMg: 50, freqId: 'bid' }), 2);
+  assert.equal(vialsPerCycle({ doseMg: 2.5, daysOn: 20, vialStrengthMg: 50, freqId: 'qd' }), 1);
+});
+
+test('Epitalon is stored as the 5 mg daily dose the protocol states', () => {
+  const p = peptide('epitalon');
+  assert.equal(p.defaultFrequency, 'qd');
+  assert.equal(p.ladder[0].dose, 5);
+  assert.equal(p.defaultDiluentMl, 5);
+  assert.ok(!p.awaitingSheet, 'the real protocol has arrived');
+
+  const calc = doseToUnits({ strength: 50, diluentMl: 5, dose: 5 });
+  close(calc.units, 50);
+  close(calc.perUnit, 0.1); // units divided by ten is the dose in mg
+  assert.equal(calc.dosesPerVial, 10); // 10 days per bottle
+  assert.equal(vialsPerCycle({ doseMg: 5, daysOn: 20, vialStrengthMg: 50, freqId: 'qd' }), 2);
+});
+
+test('the split suggestion halves the draw without changing the day', () => {
+  const p = peptide('epitalon');
+  assert.equal(p.splitDose.parts, 2);
+  assert.match(p.splitDose.reason, /nausea/);
+
+  const calc = doseToUnits({ strength: 50, diluentMl: 5, dose: 5 });
+  const s = splitDraw({ units: calc.roundedUnits, dose: calc.actualDose, parts: 2 });
+  close(s.perPartUnits, 25);
+  close(s.perPartDose, 2.5);
+  close(s.totalDose, 5, 1e-9); // the whole point: the day is unchanged
+  assert.equal(s.exact, true);
+
+  // An odd draw still halves, and says so rather than hiding the rounding.
+  const odd = splitDraw({ units: 25, dose: 2.5, parts: 2 });
+  close(odd.perPartUnits, 12.5);
+  assert.equal(odd.exact, true);
+  const awkward = splitDraw({ units: 7, dose: 0.7, parts: 2 });
+  close(awkward.perPartUnits, 3.5);
+  assert.equal(awkward.exact, true);
+  const rounded = splitDraw({ units: 4, dose: 0.4, parts: 3 });
+  assert.equal(rounded.exact, false);
+});
+
+test('NAD+ also offers the split, for the same reason', () => {
+  const p = peptide('nad');
+  assert.ok(p.splitDose, 'NAD+ is commonly reacted to and should offer it');
+  assert.equal(p.splitDose.parts, 2);
 });

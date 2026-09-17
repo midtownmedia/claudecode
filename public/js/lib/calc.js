@@ -536,3 +536,25 @@ export function smallestMeasurableDose({
   if (!Number.isFinite(conc)) return NaN;
   return (conc / unitsPerMl) * minUnits;
 }
+
+/**
+ * Split a dose into equal parts.
+ *
+ * Some compounds are better tolerated given in halves across the day. The
+ * daily amount does not change -- this is a way of handling nausea, not a
+ * different dose -- so it is derived from the full dose rather than stored.
+ */
+export function splitDraw({ units, dose, parts = 2, roundTo = 0.5 }) {
+  if (!Number.isFinite(units) || !(parts > 1)) return null;
+  const rawUnits = units / parts;
+  const perPartUnits = roundTo > 0 ? Math.round(rawUnits / roundTo) * roundTo : rawUnits;
+  const perUnitDose = units > 0 ? dose / units : NaN;
+  return {
+    parts,
+    perPartUnits,
+    perPartDose: perPartUnits * perUnitDose,
+    totalUnits: perPartUnits * parts,
+    totalDose: perPartUnits * parts * perUnitDose,
+    exact: Math.abs(rawUnits - perPartUnits) < 1e-9,
+  };
+}

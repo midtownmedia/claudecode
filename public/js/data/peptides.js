@@ -128,6 +128,7 @@ export const PEPTIDES = [
     pricing: { vialPrice: 120, strength: 500, verified: true },
     dosing: { unit: 'mg', typicalLow: 15, typicalHigh: 100, redline: 300, label: 'NAD+' },
     ladder: [{ weeks: 1, dose: 50 }, { weeks: 1, dose: 75 }, { weeks: 6, dose: 100 }],
+    splitDose: { parts: 2, reason: 'flushing and nausea', when: 'morning and again at night' },
     notes: [
       'Subcutaneous NAD+ commonly stings or burns. Injecting slowly and letting the vial come up from fridge temperature is the usual remedy.',
       'Sensitivity varies a lot between people. Starting well below a suggested schedule is common.',
@@ -201,17 +202,21 @@ export const PEPTIDES = [
     aka: ['Epithalon', 'Epithalamin', 'AEDG'],
     className: 'Tetrapeptide',
     evidence: EVIDENCE.PRECLINICAL,
-    awaitingSheet: true,
     strengthOptions: [10, 20, 50, 100],
     defaultStrength: 50,
     strengthUnit: 'mg',
     vialCapacityMl: 5,
-    defaultDiluentMl: 2.5,
+    // 5 mL makes one unit exactly 0.1 mg, so a 2.5 mg half-dose is 25 units
+    // and units divided by ten is the dose.
+    defaultDiluentMl: 5,
     defaultFrequency: 'qd',
     pricing: { vialPrice: 170, strength: 50, verified: true },
     dosing: { unit: 'mg', typicalLow: 5, typicalHigh: 10, redline: 50, label: 'Epitalon' },
     cycle: { daysOn: 20, everyDays: 182.6, label: '20 days on, twice a year' },
     ladder: [{ weeks: 3, dose: 5 }],
+    // The dose stays 5 mg a day. Splitting it is a way to handle nausea, not a
+    // different protocol, so it is offered as a suggestion rather than baked in.
+    splitDose: { parts: 2, reason: 'nausea', when: 'morning and again at night' },
     notes: [
       'Run as a course rather than continuously: 5 mg daily for 20 days, repeated about every six months. A 20 day course at 5 mg is 100 mg total, which is two 50 mg bottles.',
       'No protocol sheet for this one yet - the ladder shown is the commonly circulated range, so treat it as a placeholder until the real sheet arrives.',

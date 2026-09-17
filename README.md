@@ -76,7 +76,12 @@ water going in: 3 mL is 300 units on the same syringe.
   retatrutide bottle at full dilution bottoms out near 0.5 mg, which is why
   that is the starting dose rather than anything lower.
 - **Caps bac water at 5 mL**, which is all a bottle will take.
-- **Enforces a first-dose ceiling** on the compounds where that matters.
+- **Enforces a first-dose ceiling** on the compounds where that matters, and
+  stands down once you have logged a dose or saved a protocol, so it does not
+  cry wolf at someone already mid-ladder.
+- **Offers to halve a dose** on compounds commonly split for nausea. The daily
+  amount is unchanged — it shows the same draw as two halves, morning and
+  night, and says so only as a suggestion.
 
 ## Running it
 
@@ -84,7 +89,7 @@ No build step. It is plain ES modules.
 
 ```sh
 npm run serve      # http://localhost:8080
-npm test           # 47 tests, no dependencies
+npm test           # 54 tests, no dependencies
 ```
 
 ## Deploying to Netlify
@@ -115,7 +120,10 @@ Bottle strengths and prices move. They live in one file,
 - `strengthChanged` — records a strength that has moved, which drives the
   warning banner on the reference screen
 - `pricing` — bottle price and the strength it applies to
-- `ladder` — the protocol, always in mg
+- `ladder` — the protocol, always in mg, and always the dose as written rather
+  than a dose already divided up
+- `splitDose` — offers the halving suggestion on compounds where splitting
+  helps tolerability
 
 `test/protocol.test.js` checks each compound for internal consistency: the
 default strength has to be a listed bottle size, the default diluent has to fit

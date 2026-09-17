@@ -22,7 +22,9 @@ function s(tag, attrs = {}) {
  */
 export function syringeSvg({ units, syringe, caption, tone = 'ok' }) {
   const cap = syringe?.capacityUnits ?? 100;
-  const W = 520, H = 130;
+  // The viewBox is wider than the barrel so the last number has room to sit
+  // under the final mark without being clipped by the edge.
+  const W = 548, H = 130;
   const x0 = 46, x1 = 470, barrelY = 34, barrelH = 40;
   const span = x1 - x0;
   const frac = Math.max(0, Math.min(1, (units ?? 0) / cap));
@@ -45,16 +47,21 @@ export function syringeSvg({ units, syringe, caption, tone = 'ok' }) {
     svg.append(s('rect', { x: x0, y: barrelY, width: Math.max(2, fillX - x0), height: barrelH, rx: 4, class: 'sy-fill' }));
   }
 
-  // Graduations: a labelled major mark every 10% of capacity, minor between.
-  const majorStep = cap <= 30 ? 5 : cap <= 50 ? 10 : 10;
+  // Graduations. Long marks and printed numbers are deliberately separate: on a
+  // 100 unit barrel at phone width, numbering every long mark crowds them into
+  // an unreadable row, so every other one carries the number.
+  const majorStep = cap <= 30 ? 5 : 10;
   const minorStep = cap <= 30 ? 1 : cap <= 50 ? 2 : 5;
+  const labelStep = cap >= 100 ? 20 : majorStep;
   for (let u = 0; u <= cap + 1e-9; u += minorStep) {
     const x = x0 + span * (u / cap);
     const major = Math.abs(u % majorStep) < 1e-9;
+    const labelled = Math.abs(u % labelStep) < 1e-9;
     svg.append(s('line', {
       x1: x, y1: barrelY, x2: x, y2: barrelY + (major ? 14 : 8), class: major ? 'sy-tick-major' : 'sy-tick',
     }));
-    if (major) {
+    // The zero mark is never in doubt and its label collides with the hub.
+    if (labelled && u > 0) {
       const t = s('text', { x, y: barrelY + 28, class: 'sy-tick-label', 'text-anchor': 'middle' });
       t.textContent = String(u);
       svg.append(t);

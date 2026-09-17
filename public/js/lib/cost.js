@@ -143,10 +143,25 @@ export function amortiseCycle({ perDay, cycle }) {
   };
 }
 
-/** Bottles needed to finish one course. */
-export function vialsPerCycle({ doseMg, daysOn, vialStrengthMg }) {
-  if (!(doseMg > 0) || !(daysOn > 0) || !(vialStrengthMg > 0)) return NaN;
-  return Math.ceil((doseMg * daysOn) / vialStrengthMg);
+/**
+ * Bottles needed to finish one course.
+ *
+ * `doseMg` is one injection, not a day's worth. A protocol split across
+ * morning and evening gets through twice as much, so the cadence has to be
+ * part of this - otherwise a split course under-orders by half.
+ */
+export function vialsPerCycle({ doseMg, daysOn, vialStrengthMg, freqId = 'qd' }) {
+  const perWeek = dosesPerWeek(freqId);
+  if (!(doseMg > 0) || !(daysOn > 0) || !(vialStrengthMg > 0) || !(perWeek > 0)) return NaN;
+  const doses = Math.ceil((perWeek * daysOn) / 7);
+  return Math.ceil((doses * doseMg) / vialStrengthMg);
+}
+
+/** A day's worth, for protocols split across more than one injection. */
+export function dailyTotal({ doseMg, freqId }) {
+  const perWeek = dosesPerWeek(freqId);
+  if (!(doseMg > 0) || !(perWeek > 0)) return NaN;
+  return (doseMg * perWeek) / 7;
 }
 
 /* ------------------------------------------------------------------ *

@@ -5,6 +5,8 @@ import { PEPTIDES, peptide } from '../data/peptides.js';
 import { SYRINGES, syringe } from '../data/syringes.js';
 import { FREQUENCIES, vialExpiry, titrationStatus, vialDuration, nextDoseAt } from '../lib/schedule.js';
 import { doseToUnits } from '../lib/calc.js';
+import { dailyTotal } from '../lib/cost.js';
+import { dosesPerWeek } from '../lib/schedule.js';
 import { checkDose } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
 import { uid } from '../lib/store.js';
@@ -100,8 +102,15 @@ function protocolCard(ctx, pr) {
         (v) => set('syringeId', v)))),
 
     el('div', { class: 'stats' },
-      stat('Draw', `${fmtNum(calc.roundedUnits, 2)} units`, formatMass(calc.actualDose)),
-      stat('1 unit', formatMass(calc.perUnit)),
+      stat('Draw', `${fmtNum(calc.roundedUnits, 2)} units`,
+        dosesPerWeek(pr.frequency) > 7
+          ? `${formatMass(calc.actualDose)} per injection`
+          : formatMass(calc.actualDose)),
+      stat(dosesPerWeek(pr.frequency) > 7 ? 'Daily total' : '1 unit',
+        dosesPerWeek(pr.frequency) > 7
+          ? formatMass(dailyTotal({ doseMg: calc.requestedDose, freqId: pr.frequency }))
+          : formatMass(calc.perUnit),
+        dosesPerWeek(pr.frequency) > 7 ? `${fmtNum(dosesPerWeek(pr.frequency) / 7, 0)} injections a day` : null),
       stat('Doses left in vial', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--',
         dur ? `about ${fmtNum(dur.days, 0)} days` : null),
       stat('Next dose', next ? fmtDate(next) : 'not logged yet',
@@ -118,6 +127,10 @@ function protocolCard(ctx, pr) {
         tit.atTop
           ? `Ladder: at the top step, ${formatMass(tit.step.dose)}.`
           : `Ladder: week ${tit.weekOfStep} of ${formatMass(tit.step.dose)}. Next step ${formatMass(tit.nextStep.dose)} in ${tit.daysUntilNextStep} days (${fmtDate(tit.nextStepDate)}).`)
+      : null,
+    dosesPerWeek(pr.frequency) > 7
+      ? banner('info',
+        `Split across ${fmtNum(dosesPerWeek(pr.frequency) / 7, 0)} injections a day. You can draw them all in the morning and keep the later one capped in the fridge — one puncture of the vial instead of two. Let it warm up before injecting.`)
       : null,
     warn.length ? el('div', { class: 'warnings' }, warn.map((w) => banner(w.level, w.message))) : null,
 

@@ -4,7 +4,7 @@ import { el, field, number, banner, stat, fmtNum, fmtDate, select } from '../ui/
 import { peptide } from '../data/peptides.js';
 import { syringe } from '../data/syringes.js';
 import { doseToUnits } from '../lib/calc.js';
-import { costBreakdown, totalBurn, formatMoney, amortiseCycle, spendSummary, vialsPerCycle } from '../lib/cost.js';
+import { costBreakdown, totalBurn, formatMoney, amortiseCycle, spendSummary, vialsPerCycle, dailyTotal } from '../lib/cost.js';
 import { dosesPerWeek } from '../lib/schedule.js';
 import { formatMass } from '../lib/units.js';
 import { uid } from '../lib/store.js';
@@ -82,7 +82,7 @@ export function costView(ctx) {
             `${p.cycle.label}: ${money(cyc.duringCyclePerDay)} a day while dosing, ` +
             `${money(cyc.perCycle)} per course, ` +
             `${money(cyc.perYear)} a year — which averages ${money(cyc.amortisedPerDay)} a day. ` +
-            `Each course needs about ${vialsPerCycle({ doseMg: pr.dose, daysOn: p.cycle.daysOn, vialStrengthMg: pr.strength })} bottles.`)
+            `Each course needs about ${vialsPerCycle({ doseMg: pr.dose, daysOn: p.cycle.daysOn, vialStrengthMg: pr.strength, freqId: pr.frequency })} bottles.`)
           : null,
         breakdown.perDay > 20
           ? banner('warn', `That is ${money(breakdown.perMonth)} a month from this one compound alone.`)
