@@ -59,6 +59,9 @@
 
 * { box-sizing: border-box; }
 
+/* The tab bar is sticky, so anything scrolled to needs to clear it. */
+html { scroll-padding-top: 5.5rem; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -287,3 +290,20 @@ details.card > summary { cursor: pointer; font-weight: 600; }
 .split-when { font-size: .85rem; color: var(--muted); }
 .split-dose { font-size: .8rem; color: var(--muted); margin-top: .2rem; }
 .split-plus { font-size: 1.3rem; color: var(--muted); font-weight: 600; }
+
+/* ---- bottle strength drift notice ---- */
+.driftbox {
+  border-radius: 10px; padding: .75rem .85rem; margin: .5rem 0;
+  background: var(--danger-bg); border: 1px solid var(--danger);
+}
+.driftbox.drift-old { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 60%, transparent); }
+.drift-head { font-weight: 700; margin-bottom: .35rem; }
+.driftbox p { font-size: .9rem; margin-bottom: .5rem; }
+.drift-compare {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 8px; padding: .5rem .6rem; margin-bottom: .5rem;
+  font-variant-numeric: tabular-nums;
+}
+.drift-arrow { color: var(--muted); }
+.drift-for { color: var(--muted); font-size: .85rem; }

@@ -4,7 +4,7 @@ import { el, field, select, number, warnings, stat, fmtNum, banner } from '../ui
 import { syringeCard } from '../ui/syringe.js';
 import { PEPTIDES, peptide, sheetFor } from '../data/peptides.js';
 import { SYRINGES, syringe, bestSyringeFor } from '../data/syringes.js';
-import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, splitDraw, MAX_BAC_WATER_ML } from '../lib/calc.js';
+import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, splitDraw, scaleBetween, describeScale, MAX_BAC_WATER_ML } from '../lib/calc.js';
 import { checkDose, checkFirstDose, checkMeasurability } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
 
@@ -60,6 +60,34 @@ export function calculatorView(ctx) {
   const smaller = bestSyringeFor(calc.roundedUnits);
 
   const sheet = sheetFor(p.id);
+
+  // Bottles that changed strength are the whole reason this app exists, so the
+  // warning belongs on the screen people actually use, not only on Reference.
+  let drift = null;
+  if (p.strengthChanged) {
+    const { from, to } = p.strengthChanged;
+    const onOld = Math.abs(st.strength - from) < 1e-9;
+    const sheetVial = sheet?.sheetStrength
+      ? { strength: sheet.sheetStrength, strengthUnit: p.strengthUnit, diluentMl: sheet.sheetDiluentMl }
+      : null;
+    const here = { strength: st.strength, strengthUnit: p.strengthUnit, diluentMl: st.diluentMl };
+    const scale = sheetVial ? scaleBetween(sheetVial, here, syr.unitsPerMl) : NaN;
+    const sheetDraw = sheetVial
+      ? doseToUnits({ ...sheetVial, dose: st.dose, doseUnit: 'mg', unitsPerMl: syr.unitsPerMl, roundTo: 0.5 })
+      : null;
+    // The unit multiplier is not the strength ratio whenever the amount of
+    // water also differs from the sheet. Saying "40 mg is 4x" next to "draw a
+    // third" reads as a contradiction unless the water is spelled out.
+    const waterDiffers = sheetVial && Math.abs(sheetVial.diluentMl - st.diluentMl) > 1e-9;
+    drift = {
+      from, to, onOld, scale, waterDiffers,
+      sheetWaterMl: sheetVial?.diluentMl,
+      described: describeScale(scale),
+      sheetUnits: sheetDraw?.roundedUnits,
+      differs: Number.isFinite(scale) && Math.abs(scale - 1) > 1e-6,
+    };
+  }
+
   const split = p.splitDose
     ? splitDraw({ units: calc.roundedUnits, dose: calc.actualDose, parts: p.splitDose.parts })
     : null;
@@ -67,6 +95,47 @@ export function calculatorView(ctx) {
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
       el('h2', {}, 'What do I draw?'),
+      (drift
+        ? el('div', { class: `driftbox drift-${drift.onOld ? 'old' : 'new'}` },
+          el('div', { class: 'drift-head' },
+            `Bottles for ${p.name} changed from ${drift.from} ${p.strengthUnit} to ${drift.to} ${p.strengthUnit}`),
+          drift.onOld
+            ? el('p', {},
+              `You have the ${drift.from} ${p.strengthUnit} bottle selected. These now ship at `
+              + `${drift.to} ${p.strengthUnit} in a bottle that looks identical, so check the label before you draw.`)
+            : el('p', {},
+              `Any sheet written for the ${drift.from} ${p.strengthUnit} bottle is wrong for this one. `
+              + (drift.waterDiffers
+                ? `That sheet used ${fmtNum(drift.sheetWaterMl, 2)} mL of bac water and you have ${fmtNum(st.diluentMl, 2)} mL in, so both numbers have moved: `
+                : '')
+              + (drift.described
+                ? (drift.waterDiffers
+                  // Follows a colon, so it continues the sentence.
+                  ? drift.described.plain.charAt(0).toLowerCase() + drift.described.plain.slice(1)
+                  : drift.described.plain)
+                : '')),
+          drift.differs && Number.isFinite(drift.sheetUnits)
+            ? el('div', { class: 'drift-compare' },
+              el('span', { class: 'was' }, `sheet said ${fmtNum(drift.sheetUnits, 2)} units`),
+              el('span', { class: 'drift-arrow' }, '→'),
+              el('span', { class: 'now' }, `draw ${fmtNum(calc.roundedUnits, 2)} units`),
+              el('span', { class: 'drift-for' }, `for ${formatMass(calc.requestedDose)}`))
+            : null,
+          el('button', {
+            type: 'button', class: 'linkbtn',
+            onclick: () => {
+              ctx.ui.swap = {
+                peptideId: p.id,
+                oldStrength: drift.from, oldDiluentMl: sheet?.sheetDiluentMl ?? st.diluentMl,
+                newStrength: st.strength, newDiluentMl: st.diluentMl, syringeId: st.syringeId,
+              };
+              ctx.tab = 'swap';
+              location.hash = 'swap';
+              ctx.render();
+            },
+          }, 'Compare the two bottles'))
+        : null),
+
       p.highRisk
         ? banner('warn', `${p.name} is the one here with real potential to hurt someone. ` +
           (p.firstDose ? p.firstDose.note + ' ' : '') +
