@@ -275,6 +275,8 @@ export function suggestDiluents({
   minUnits = 8,
   step = 0.5,
   maxCandidates = 4,
+  criticalDose = null,
+  minCriticalUnits = 4,
 }) {
   const strengthBase = toBase(strength, strengthUnit);
   const doseList = doses.map((d) => toBase(d, doseUnit)).filter((d) => d > 0).sort((a, b) => a - b);
@@ -326,11 +328,21 @@ export function suggestDiluents({
     });
   }
 
-  candidates.sort((a, b) => b.score - a.score);
+  // A starting dose that cannot be measured is not a trade-off to be scored
+  // against tidiness -- it is disqualifying. Only fall back to the full list if
+  // no volume can deliver it at all.
+  let pool = candidates;
+  if (criticalDose > 0) {
+    const critBase = toBase(criticalDose, doseUnit);
+    const viable = candidates.filter((c) => critBase / c.perUnit >= minCriticalUnits - 1e-9);
+    if (viable.length) pool = viable;
+  }
+
+  const sorted = [...pool].sort((a, b) => b.score - a.score);
 
   // De-duplicate near-identical concentrations so the list stays useful.
   const picked = [];
-  for (const c of candidates) {
+  for (const c of sorted) {
     if (picked.some((p) => isNear(p.perUnit, c.perUnit, 1e-3))) continue;
     picked.push(c);
     if (picked.length >= maxCandidates) break;
@@ -442,6 +454,10 @@ export function describeScale(scale) {
 /**
  * Make a weaker working vial from an over-concentrated one.
  *
+ * NOT CURRENTLY SURFACED IN THE UI: this needs a spare empty sterile vial,
+ * which nobody using this has to hand yet. Kept and tested so the screen can be
+ * switched on once that changes.
+ *
  * A large bottle cannot deliver a small starting dose: 0.25 mg from a 60 mg
  * bottle lands on about two marks however much water goes in, because the vial
  * will not hold the 24 mL it would take. The way out is to draw part of the
@@ -492,4 +508,31 @@ export function secondaryDilution({
     sourceUnitsToDraw: carry * unitsPerMl,
     targetUnits,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Practical limits
+ * ------------------------------------------------------------------ */
+
+/** A bottle will not take more than this much bac water. */
+export const MAX_BAC_WATER_ML = 5;
+
+/**
+ * The smallest dose this bottle can actually deliver.
+ *
+ * Below a few marks you are estimating, not measuring, so there is a floor on
+ * what any given bottle can do. Worth knowing before a protocol asks for a
+ * starting dose the bottle cannot produce.
+ */
+export function smallestMeasurableDose({
+  strength,
+  strengthUnit = 'mg',
+  diluentMl,
+  unitsPerMl = 100,
+  minUnits = 4,
+}) {
+  const strengthBase = toBase(strength, strengthUnit);
+  const conc = concentration({ strength: strengthBase, diluentMl });
+  if (!Number.isFinite(conc)) return NaN;
+  return (conc / unitsPerMl) * minUnits;
 }

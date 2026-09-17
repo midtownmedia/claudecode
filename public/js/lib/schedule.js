@@ -68,39 +68,33 @@ export function titrationStatus({ ladder = [], startDate, on = new Date() }) {
 }
 
 /**
- * Beyond-use date for a reconstituted vial.
+ * The diluent is bacteriostatic water. That is not a setting.
  *
- * Bacteriostatic water contains benzyl alcohol and is multi-dose, commonly
- * treated as 28 days refrigerated once punctured. Plain sterile water has no
- * preservative at all and is a single-use product.
+ * It carries 0.9% benzyl alcohol, which is what makes it multi-dose: once
+ * punctured it is commonly given 28 days refrigerated. Plain sterile water has
+ * no preservative and holds sterility for about a day, which is why it is not
+ * used for a vial you intend to draw from repeatedly.
  */
-export const DILUENTS = [
-  {
-    id: 'bacteriostatic',
-    label: 'Bacteriostatic water (0.9% benzyl alcohol)',
-    budDays: 28,
-    note: 'Multi-dose. Commonly discarded 28 days after the first puncture, kept refrigerated.',
-  },
-  {
-    id: 'sterile',
-    label: 'Sterile water (no preservative)',
-    budDays: 1,
-    note: 'No preservative, so it does not hold back bacterial growth. Intended for single use - it is not a multi-dose diluent.',
-  },
-  {
-    id: 'saline-bact',
-    label: 'Bacteriostatic saline',
-    budDays: 28,
-    note: 'Multi-dose. Same 28 day convention as bacteriostatic water.',
-  },
-];
+export const BAC_WATER = {
+  id: 'bacteriostatic',
+  label: 'Bacteriostatic water',
+  detail: '0.9% benzyl alcohol',
+  budDays: 28,
+  note: 'Multi-dose. Commonly discarded 28 days after the first puncture, kept refrigerated.',
+};
 
-export function diluent(id) {
-  return DILUENTS.find((d) => d.id === id) ?? DILUENTS[0];
+export const STERILE_WATER_CAUTION = {
+  label: 'Sterile water',
+  budDays: 1,
+  note: 'No preservative, so it holds sterility for roughly 24 hours. Not suitable for a vial you will draw from for weeks.',
+};
+
+export function diluent() {
+  return BAC_WATER;
 }
 
-export function vialExpiry({ openedAt, diluentId }) {
-  const d = diluent(diluentId);
+export function vialExpiry({ openedAt }) {
+  const d = BAC_WATER;
   if (!openedAt) return null;
   const opened = new Date(openedAt).getTime();
   if (!Number.isFinite(opened)) return null;

@@ -20,6 +20,10 @@ identical. When that happens, every number on the sheet silently becomes wrong:
 | BPC-157 / TB-500 blend | 10 mg | 20 mg | **2x** the intended dose |
 | Retatrutide | strength unstated | 60 mg | up to **6x**, depending on assumption |
 
+SS-31 is the one that has not moved: its sheet quoted both the unit counts and
+the resulting mg, and those only reconcile at 50 mg in 3 mL, which is still what
+ships.
+
 The app stores every protocol as a **dose in mg** and derives the units from
 whichever bottle you tell it you have. Change the bottle in the dropdown and the
 whole ladder is rewritten.
@@ -44,18 +48,34 @@ whole ladder is rewritten.
 - **Reference** — dose ranges, risks, evidence level, red-flag symptoms and
   handling notes.
 
+### Terms
+
+The **peptide** is the drug. It arrives as a dried powder and the label states
+how many **mg** are in the bottle.
+
+**Bacteriostatic water** is the diluent. You add it in **mL** — 3 mL is common,
+5 mL is the most a bottle takes. It is the only diluent here; plain sterile
+water holds sterility for about a day, so it is no use for a vial you will draw
+from for weeks.
+
+**Units** are neither. They are the marks on the syringe, used only to measure a
+dose. On a U-100 syringe 1 mL = 100 units, which is also how you measure the bac
+water going in: 3 mL is 300 units on the same syringe.
+
 ### Things it deliberately does
 
 - **Refuses to convert mg to IU.** That conversion is compound specific, so
   guessing it is exactly the kind of error this app exists to catch.
 - **Shows what the rounded mark really delivers**, not just the ideal number.
   If 6.67 units rounds to 7, it says you are getting 5% more than you asked for.
-- **Recommends a diluent volume** that makes the ladder land on whole marks. For
-  a 60 mg bottle, 6 mL makes one unit exactly 0.1 mg, so units and mg differ only
-  by a decimal point.
-- **Catches doses it cannot measure.** A 60 mg bottle cannot deliver 0.25 mg on
-  any readable mark, so it works out a secondary dilution into a second sterile
-  vial instead.
+- **Recommends how much bac water to add** so the ladder lands on whole marks,
+  and treats a measurable starting dose as a hard constraint rather than
+  something to trade off against tidiness.
+- **Knows the smallest dose a bottle can deliver.** Below a few marks you are
+  estimating rather than measuring, so each bottle has a floor. A 60 mg
+  retatrutide bottle at full dilution bottoms out near 0.5 mg, which is why
+  that is the starting dose rather than anything lower.
+- **Caps bac water at 5 mL**, which is all a bottle will take.
 - **Enforces a first-dose ceiling** on the compounds where that matters.
 
 ## Running it
@@ -64,7 +84,7 @@ No build step. It is plain ES modules.
 
 ```sh
 npm run serve      # http://localhost:8080
-npm test           # 45 tests, no dependencies
+npm test           # 47 tests, no dependencies
 ```
 
 ## Deploying to Netlify

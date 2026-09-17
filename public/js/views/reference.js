@@ -3,7 +3,7 @@
 import { el, banner, fmtNum } from '../ui/dom.js';
 import { PEPTIDES, EVIDENCE, sheetFor } from '../data/peptides.js';
 import { RED_FLAGS, SHARP_SAFETY } from '../lib/safety.js';
-import { DILUENTS } from '../lib/schedule.js';
+import { BAC_WATER, STERILE_WATER_CAUTION } from '../lib/schedule.js';
 import { formatMass } from '../lib/units.js';
 import { toBase } from '../lib/units.js';
 
@@ -78,9 +78,14 @@ export function referenceView(ctx) {
     el('div', { class: 'card' },
       el('h3', {}, 'Handling'),
       el('ul', { class: 'notes' }, SHARP_SAFETY.map((s) => el('li', {}, s))),
-      el('h4', {}, 'Diluents'),
-      el('ul', { class: 'notes' }, DILUENTS.map((d) =>
-        el('li', {}, el('strong', {}, d.label), ` — ${d.note}`)))),
+      el('h4', {}, 'Bac water'),
+      el('p', { class: 'muted' },
+        'The peptide is the drug and arrives as a dried powder, measured in mg on the label. ' +
+        'Bacteriostatic water is the diluent you add to dissolve it, measured in mL. ' +
+        'Units are neither — they are just the marks on the syringe you measure a dose with.'),
+      el('ul', { class: 'notes' },
+        el('li', {}, el('strong', {}, BAC_WATER.label), ` (${BAC_WATER.detail}) — ${BAC_WATER.note}`),
+        el('li', {}, el('strong', {}, STERILE_WATER_CAUTION.label), ` — ${STERILE_WATER_CAUTION.note}`))),
 
     el('div', { class: 'card' },
       el('h3', {}, 'Your data'),

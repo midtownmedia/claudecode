@@ -158,21 +158,19 @@ export function checkFirstDose(doseMg, peptide, { hasHistory = false } = {}) {
  * Can this bottle physically deliver this dose?
  * A dose that lands on one or two marks is not a dose, it is a guess.
  */
-export function checkMeasurability({ units, syringe, highRisk = false }) {
+export function checkMeasurability({ units, syringe, highRisk = false, smallestDose = null, atMaxWater = false }) {
   if (!Number.isFinite(units) || units <= 0) return [];
   const floor = highRisk ? 4 : 2;
-  if (units < floor) {
-    const narrower = syringe && syringe.capacityUnits > 30;
-    return [{
-      level: highRisk ? LEVEL.DANGER : LEVEL.WARN,
-      code: 'unmeasurable',
-      message:
-        `${Number(units.toFixed(2))} units is too small to measure reliably${syringe ? ` on a ${syringe.label}` : ''}. ` +
-        (narrower
-          ? 'Switch to a 0.3 mL / 30 unit syringe, where the marks are much further apart. '
-          : '') +
-        'If it is still this small, the bottle is too concentrated for this dose - either dilute further, or draw part of the solution into a second sterile vial and dilute that.',
-    }];
+  if (units >= floor) return [];
+
+  const narrower = syringe && syringe.capacityUnits > 30;
+  const parts = [`${Number(units.toFixed(2))} units is too small to measure reliably${syringe ? ` on a ${syringe.label}` : ''}.`];
+  if (narrower) parts.push('Switch to a 0.3 mL / 30 unit syringe, where the marks sit much further apart.');
+  if (!atMaxWater) parts.push('Adding more bac water, up to the 5 mL a bottle will take, spreads the dose over more marks.');
+  if (atMaxWater && Number.isFinite(smallestDose)) {
+    parts.push(
+      `This bottle is already at full dilution, so it cannot go lower: the smallest dose it can measure is about ${formatMass(smallestDose)}. Start there instead.`
+    );
   }
-  return [];
+  return [{ level: highRisk ? LEVEL.DANGER : LEVEL.WARN, code: 'unmeasurable', message: parts.join(' ') }];
 }

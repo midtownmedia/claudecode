@@ -3,7 +3,7 @@
 import { el, field, select, number, banner, fmtDate, fmtNum, stat } from '../ui/dom.js';
 import { PEPTIDES, peptide } from '../data/peptides.js';
 import { SYRINGES, syringe } from '../data/syringes.js';
-import { FREQUENCIES, DILUENTS, vialExpiry, titrationStatus, vialDuration, nextDoseAt } from '../lib/schedule.js';
+import { FREQUENCIES, vialExpiry, titrationStatus, vialDuration, nextDoseAt } from '../lib/schedule.js';
 import { doseToUnits } from '../lib/calc.js';
 import { checkDose } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
@@ -14,7 +14,7 @@ function blank() {
   return {
     id: uid(), peptideId: p.id, nickname: '', active: true,
     strength: p.defaultStrength, diluentMl: p.defaultDiluentMl ?? 3,
-    diluentId: 'bacteriostatic', openedAt: new Date().toISOString().slice(0, 10),
+    openedAt: new Date().toISOString().slice(0, 10),
     dose: p.ladder?.[0]?.dose ?? 1, frequency: p.defaultFrequency ?? 'qd',
     syringeId: 'u100-10', startDate: new Date().toISOString().slice(0, 10),
     useLadder: true,
@@ -44,7 +44,7 @@ function protocolCard(ctx, pr) {
     strength: pr.strength, strengthUnit: p.strengthUnit, diluentMl: pr.diluentMl,
     dose: pr.dose, doseUnit: 'mg', unitsPerMl: syr.unitsPerMl, roundTo: 0.5,
   });
-  const exp = vialExpiry({ openedAt: pr.openedAt, diluentId: pr.diluentId });
+  const exp = vialExpiry({ openedAt: pr.openedAt });
   const tit = pr.useLadder ? titrationStatus({ ladder: p.ladder, startDate: pr.startDate }) : null;
   const dur = vialDuration({ dosesPerVial: calc.dosesPerVial, freqId: pr.frequency });
   const logs = ctx.state.logs.filter((l) => l.protocolId === pr.id).sort((a, b) => new Date(b.at) - new Date(a.at));
@@ -88,8 +88,6 @@ function protocolCard(ctx, pr) {
       field('Bac water', el('div', { class: 'row' },
         number(pr.diluentMl, (v) => set('diluentMl', v), { min: 0, step: 'any' }),
         el('span', { class: 'suffix' }, 'mL'))),
-      field('Diluent', select(DILUENTS.map((d) => ({ value: d.id, label: d.label })), pr.diluentId,
-        (v) => set('diluentId', v))),
       field('Mixed on', el('input', {
         type: 'date', value: pr.openedAt ?? '', onchange: (e) => set('openedAt', e.target.value),
       })),
@@ -113,7 +111,7 @@ function protocolCard(ctx, pr) {
       ? banner(exp.expired ? 'danger' : exp.daysLeft <= 5 ? 'warn' : 'info',
         exp.expired
           ? `This vial passed its ${exp.budDays}-day beyond-use date on ${fmtDate(exp.expires)}.`
-          : `${exp.diluent.label}: discard around ${fmtDate(exp.expires)} (${exp.daysLeft} days left). ${exp.diluent.note}`)
+          : `Bac water: discard around ${fmtDate(exp.expires)} (${exp.daysLeft} days left). ${exp.diluent.note}`)
       : null,
     tit
       ? banner('info',

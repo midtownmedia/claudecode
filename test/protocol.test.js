@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { costBreakdown, totalBurn, amortiseCycle, vialsPerCycle, spendSummary } from '../public/js/lib/cost.js';
-import { dosesPerWeek, nextDoseAt, titrationStatus, vialExpiry, vialDuration, diluent } from '../public/js/lib/schedule.js';
+import { dosesPerWeek, nextDoseAt, titrationStatus, vialExpiry, vialDuration, BAC_WATER, STERILE_WATER_CAUTION } from '../public/js/lib/schedule.js';
 import { migrate, suggestSite, importJson, exportJson, DEFAULT_STATE, SITES } from '../public/js/lib/store.js';
-import { checkDose, checkEscalation } from '../public/js/lib/safety.js';
-import { doseToUnits } from '../public/js/lib/calc.js';
+import { checkDose, checkEscalation, checkFirstDose } from '../public/js/lib/safety.js';
+import { doseToUnits, smallestMeasurableDose, MAX_BAC_WATER_ML } from '../public/js/lib/calc.js';
 import { peptide, PEPTIDES, sheetFor } from '../public/js/data/peptides.js';
 import { bestSyringeFor } from '../public/js/data/syringes.js';
 
@@ -37,6 +37,9 @@ test('shipping and consumables land in the per-dose price', () => {
 
 test('SS-31 at the top of its ladder is over a thousand a month', () => {
   const p = peptide('ss-31');
+  // The sheet stated both units and mg; 30 units = 5 mg only resolves at 50 mg in 3 mL.
+  assert.equal(p.pricing.strength, 50);
+  assert.ok(!p.strengthUnconfirmed);
   const calc = doseToUnits({ strength: 50, diluentMl: 3, dose: 10 });
   assert.equal(calc.dosesPerVial, 5);
   const b = costBreakdown({ vialPrice: 230, dosesPerVial: 5, freqId: 'qd' });
@@ -101,15 +104,18 @@ test('titration reports the current step and when the next one is due', () => {
   assert.equal(top.step.dose, 15);
 });
 
-test('bacteriostatic water gets 28 days, plain sterile water does not', () => {
-  assert.equal(diluent('bacteriostatic').budDays, 28);
-  assert.equal(diluent('sterile').budDays, 1);
+test('bac water is the diluent and gets 28 days from first puncture', () => {
+  assert.equal(BAC_WATER.budDays, 28);
+  // Sterile water is documented as a caution, not offered as an alternative.
+  assert.equal(STERILE_WATER_CAUTION.budDays, 1);
+
   const opened = new Date(Date.now() - 30 * 86400000).toISOString();
-  const e = vialExpiry({ openedAt: opened, diluentId: 'bacteriostatic' });
-  assert.equal(e.expired, true);
-  const fresh = vialExpiry({ openedAt: new Date().toISOString(), diluentId: 'bacteriostatic' });
+  assert.equal(vialExpiry({ openedAt: opened }).expired, true);
+
+  const fresh = vialExpiry({ openedAt: new Date().toISOString() });
   assert.equal(fresh.expired, false);
   assert.ok(fresh.daysLeft >= 27);
+  assert.equal(fresh.diluent.label, 'Bacteriostatic water');
 });
 
 test('vial duration converts doses into days at a given cadence', () => {
@@ -193,5 +199,31 @@ test('sheets that were written for a superseded bottle are marked as such', () =
     assert.ok(sheet, `${p.name}: strength changed but no sheet recorded`);
     assert.equal(sheet.sheetStrength, p.strengthChanged.from,
       `${p.name}: sheet should be pinned to the old bottle strength`);
+  }
+});
+
+test('retatrutide starts at a dose its bottle can actually measure', () => {
+  const p = peptide('retatrutide');
+  const first = p.ladder[0].dose;
+  assert.equal(first, 0.5);
+  assert.equal(p.firstDose.max, 1);
+  assert.equal(p.highRisk, true);
+
+  // 60 mg at the full 5 mL of bac water must put that first dose on a readable mark.
+  const floor = smallestMeasurableDose({ strength: 60, diluentMl: 5, minUnits: 4 });
+  assert.ok(first >= floor - 1e-9, `first dose ${first} is below the bottle floor ${floor}`);
+
+  // And the first-dose guard must reject anything above 1 mg with no history.
+  assert.equal(checkFirstDose(0.5, p).length, 0);
+  assert.equal(checkFirstDose(2, p)[0].level, 'danger');
+  assert.match(checkFirstDose(2, p)[0].message, /never exceed 1 mg|ceiling for a first dose/);
+  // Once there is history the guard steps aside.
+  assert.equal(checkFirstDose(4, p, { hasHistory: true }).length, 0);
+});
+
+test('no bottle is asked to hold more than 5 mL of bac water', () => {
+  for (const p of PEPTIDES) {
+    assert.ok(p.vialCapacityMl <= MAX_BAC_WATER_ML, `${p.name}: capacity over ${MAX_BAC_WATER_ML} mL`);
+    assert.ok(p.defaultDiluentMl <= MAX_BAC_WATER_ML, `${p.name}: default water over ${MAX_BAC_WATER_ML} mL`);
   }
 });

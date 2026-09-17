@@ -4,7 +4,7 @@ import { el, field, select, number, warnings, stat, fmtNum, banner } from '../ui
 import { syringeCard } from '../ui/syringe.js';
 import { PEPTIDES, peptide, sheetFor } from '../data/peptides.js';
 import { SYRINGES, syringe, bestSyringeFor } from '../data/syringes.js';
-import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, secondaryDilution } from '../lib/calc.js';
+import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, MAX_BAC_WATER_ML } from '../lib/calc.js';
 import { checkDose, checkFirstDose, checkMeasurability } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
 
@@ -31,26 +31,30 @@ export function calculatorView(ctx) {
   const clinical = checkDose(calc.requestedDose, p);
   const hasHistory = ctx.state.logs.some((l) => l.peptideId === p.id);
   const first = checkFirstDose(calc.requestedDose, p, { hasHistory });
-  const measure = checkMeasurability({ units: calc.units, syringe: syr, highRisk: p.highRisk });
+  const floorDose = smallestMeasurableDose({
+    strength: st.strength, strengthUnit: p.strengthUnit, diluentMl: st.diluentMl,
+    unitsPerMl: syr.unitsPerMl, minUnits: p.highRisk ? 4 : 2,
+  });
+  const atMaxWater = st.diluentMl >= MAX_BAC_WATER_ML - 1e-9;
+  const measure = checkMeasurability({
+    units: calc.units, syringe: syr, highRisk: p.highRisk,
+    smallestDose: floorDose, atMaxWater,
+  });
   const all = [...draw, ...clinical, ...first, ...measure];
   const tone = all.some((w) => w.level === 'danger') ? 'danger'
     : all.some((w) => w.level === 'warn') ? 'warn' : 'ok';
 
   const rec = suggestDiluents({
     strength: st.strength, doses: (p.ladder ?? []).map((l) => l.dose),
-    vialCapacityMl: p.vialCapacityMl, syringeCapacityUnits: syr.capacityUnits,
+    vialCapacityMl: Math.min(p.vialCapacityMl, MAX_BAC_WATER_ML),
+    syringeCapacityUnits: syr.capacityUnits,
+    criticalDose: p.ladder?.[0]?.dose ?? null,
   });
   const best = rec[0];
   const better = best && Math.abs(best.diluentMl - st.diluentMl) > 1e-6 ? best : null;
   const smaller = bestSyringeFor(calc.roundedUnits);
 
   const sheet = sheetFor(p.id);
-  const split = measure.length
-    ? secondaryDilution({
-      sourceConc: calc.concentration, targetDose: calc.requestedDose,
-      targetUnits: 10, unitsPerMl: syr.unitsPerMl, secondVialMl: p.vialCapacityMl,
-    })
-    : null;
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
@@ -86,7 +90,7 @@ export function calculatorView(ctx) {
             el('span', { class: 'suffix' }, 'mL'),
             el('span', { class: 'equals' },
               `= ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units`)),
-          'Protocol sheets often write this as units of water. 100 units = 1 mL.'),
+          `1 mL = 100 units on a U-100 syringe, so ${fmtNum(st.diluentMl ?? 0, 2)} mL is ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units if you measure it with one. A bottle takes ${MAX_BAC_WATER_ML} mL at most.`),
         field('Syringe', select(
           SYRINGES.map((x) => ({ value: x.id, label: x.label })), st.syringeId,
           (v) => { st.syringeId = v; ctx.state.settings.syringeId = v; ctx.save(); ctx.render(); })),
@@ -121,8 +125,13 @@ export function calculatorView(ctx) {
         stat('Actually delivered', formatMass(calc.actualDose),
           Number.isFinite(calc.errorPct) && Math.abs(calc.errorPct) >= 0.05
             ? `${calc.errorPct > 0 ? '+' : ''}${fmtNum(calc.errorPct, 1)}% vs target` : 'exact'),
-        stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--')),
+        stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--'),
+        stat('Smallest this bottle can do', formatMass(floorDose),
+          atMaxWater ? 'at full dilution' : `at ${fmtNum(st.diluentMl, 2)} mL`)),
       warnings(all),
+      st.diluentMl > MAX_BAC_WATER_ML
+        ? banner('danger', `${fmtNum(st.diluentMl, 2)} mL will not fit. A bottle takes about ${MAX_BAC_WATER_ML} mL of bac water at most.`)
+        : null,
       smaller && smaller.id !== syr.id && calc.roundedUnits <= smaller.capacityUnits
         ? banner('info',
           `A ${smaller.label} syringe would hold this draw with the marks spaced further apart, which makes ${fmtNum(calc.roundedUnits, 2)} units easier to hit accurately.`)
@@ -137,27 +146,6 @@ export function calculatorView(ctx) {
             onclick: () => { st.diluentMl = better.diluentMl; ctx.render(); },
           }, 'use this')))
         : null),
-
-    (measure.length && split
-      ? el('div', { class: 'card' },
-        el('h3', {}, 'Make a weaker vial for this dose'),
-        el('p', { class: 'lede' },
-          `This bottle is too concentrated to measure ${formatMass(calc.requestedDose)} accurately. ` +
-          'Nothing more goes into it — you move a little of it into a second empty sterile vial and dilute that one instead.'),
-        el('ol', { class: 'maths' },
-          el('li', {}, `Leave the bottle you already mixed exactly as it is: ${fmtNum(st.diluentMl, 2)} mL at ${formatMass(calc.perUnit)} per unit.`),
-          el('li', {}, `Draw ${fmtNum(split.drawMl, 2)} mL out of it — that is ${fmtNum(split.sourceUnitsToDraw, 0)} units on your syringe.`),
-          el('li', {}, `Put that into a second empty sterile vial and add ${fmtNum(split.addMl, 2)} mL of bacteriostatic water. The second vial ends up holding ${fmtNum(split.totalMl, 2)} mL.`),
-          el('li', {}, `The second vial is now ${formatMass(split.perUnit)} per unit, so ${formatMass(calc.requestedDose)} is exactly ${fmtNum(split.targetUnits, 0)} units.`),
-          el('li', {}, `It holds about ${split.dosesAvailable} doses. Label it with the date and the new strength before you put it down.`)),
-        el('div', { class: 'stats' },
-          stat('Original bottle', `${fmtNum(st.diluentMl, 2)} mL`, 'unchanged'),
-          stat('Second vial', `${fmtNum(split.totalMl, 2)} mL`, split.fits ? `fits a ${split.secondVialMl} mL vial` : 'needs a larger vial'),
-          stat('Dilution', `${fmtNum(split.factor, 1)}x weaker`),
-          stat('Doses in it', split.dosesAvailable)),
-        split.fits ? null : banner('warn', `That comes to ${fmtNum(split.totalMl, 2)} mL, which will not fit a ${split.secondVialMl} mL vial. Carry less across, or split it over two vials.`),
-        banner('warn', 'Label the second vial immediately, including its strength. An unlabelled vial of unknown concentration is exactly how the mistakes in this app happen.'))
-      : null),
 
     el('details', { class: 'card' },
       el('summary', {}, 'Show me the maths'),
