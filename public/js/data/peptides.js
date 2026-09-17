@@ -1,0 +1,363 @@
+/**
+ * Compound reference.
+ *
+ * `strengthOptions` drives the bottle dropdown -- the sizes these actually ship
+ * in. `ladder` is always stored as real doses (mg), never as syringe units,
+ * because units are a property of the bottle and not of the protocol.
+ *
+ * Dose figures are the ranges these compounds are described at in published
+ * trials where they exist, and in circulated protocol sheets where they do not.
+ * They describe what is commonly done. They are not a recommendation, and
+ * several of these have no approved human dose at all.
+ */
+
+export const EVIDENCE = {
+  APPROVED: 'approved',
+  TRIAL: 'trial',
+  PRECLINICAL: 'preclinical',
+  ANECDOTAL: 'anecdotal',
+};
+
+export const PEPTIDES = [
+  {
+    id: 'retatrutide',
+    name: 'Retatrutide',
+    aka: ['GLP-3', 'Reta', 'LY3437943'],
+    className: 'Triple agonist (GIP / GLP-1 / glucagon)',
+    evidence: EVIDENCE.TRIAL,
+    strengthOptions: [5, 10, 12, 15, 20, 24, 30, 40, 50, 60],
+    defaultStrength: 60,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qw',
+    pricing: { vialPrice: 200, strength: 60, verified: true },
+    dosing: { unit: 'mg', typicalLow: 0.25, typicalHigh: 8, redline: 12, minDaysBetweenIncreases: 28, label: 'Retatrutide' },
+    highRisk: true,
+    firstDose: {
+      recommended: 0.25,
+      recommendedMax: 0.5,
+      max: 1,
+      note: 'Start at 0.25 to 0.5 mg to see how you tolerate it. A first dose must never exceed 1 mg.',
+    },
+    ladder: [
+      { weeks: 1, dose: 0.25 }, { weeks: 1, dose: 0.5 }, { weeks: 4, dose: 1 },
+      { weeks: 4, dose: 2 }, { weeks: 4, dose: 3 }, { weeks: 4, dose: 4 },
+      { weeks: 4, dose: 6 }, { weeks: 4, dose: 8 }, { weeks: 4, dose: 12 },
+    ],
+    notes: [
+      'Investigational. No approved human dose exists - phase 2 trials escalated slowly over months, and 12 mg was the top arm reached after long titration, not a starting point.',
+      'Start at 0.25 to 0.5 mg to gauge tolerance. A first dose should never exceed 1 mg, whatever a sheet says.',
+      'A 60 mg bottle cannot measure a 0.25 mg dose accurately on a 1 mL syringe. Use the narrowest syringe you have, or split the reconstituted solution into a second sterile vial and dilute it further.',
+      'Titration is the whole safety story here. Every step exists to let the gut adapt.',
+      'Flu-like feeling, relentless nausea or vomiting means the last step was too big. Drop back rather than push on.',
+    ],
+    risks: [
+      'Severe nausea, vomiting and dehydration are the common reasons people end up needing medical care.',
+      'Markedly raises the risk of low blood sugar if combined with insulin or a sulfonylurea.',
+      'Slows stomach emptying, which matters for anaesthesia - tell any anaesthetist before a procedure.',
+      'Reported to raise heart rate.',
+      'Not to be combined with another GLP-1 agonist. Doubling up is a common and serious error.',
+    ],
+  },
+  {
+    id: 'mots-c',
+    name: 'MOTS-c',
+    aka: ['MOTSc'],
+    className: 'Mitochondrial-derived peptide',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [5, 10, 20, 30, 40, 50],
+    defaultStrength: 40,
+    strengthChanged: { from: 10, to: 40 },
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 4,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 275, strength: 40, verified: true },
+    dosing: { unit: 'mg', typicalLow: 0.2, typicalHigh: 1, redline: 10, label: 'MOTS-c' },
+    ladder: [
+      { weeks: 2, dose: 0.2 }, { weeks: 2, dose: 0.4 }, { weeks: 2, dose: 0.6 },
+      { weeks: 2, dose: 0.8 }, { weeks: 2, dose: 1.0 },
+    ],
+    notes: [
+      'Circulated sheets were written for a 10 mg vial. The 40 mg bottle is physically identical, so the label is the only way to tell them apart.',
+      'A 40 mg bottle is oversized for sub-milligram doses: even well diluted, early steps land on very small marks. Use the narrowest syringe you have.',
+    ],
+    risks: ['Human safety data is thin. Preclinical work only.'],
+  },
+  {
+    id: 'ss-31',
+    name: 'SS-31',
+    aka: ['Elamipretide', 'MTP-131'],
+    className: 'Mitochondria-targeted tetrapeptide',
+    evidence: EVIDENCE.TRIAL,
+    strengthOptions: [10, 20, 50, 100],
+    defaultStrength: 50,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 230, strength: 50, verified: false },
+    dosing: { unit: 'mg', typicalLow: 5, typicalHigh: 40, redline: 60, label: 'SS-31' },
+    ladder: [{ weeks: 2, dose: 5 }, { weeks: 6, dose: 10 }],
+    notes: [
+      'Nausea early on is commonly reported and usually settles.',
+      'Bottle strength for this one is unconfirmed - the price suggests it may no longer be 50 mg. Check the label before drawing anything.',
+    ],
+    strengthUnconfirmed: true,
+    risks: ['Injection site reactions are the most frequently reported issue in trials.'],
+  },
+  {
+    id: 'nad',
+    name: 'NAD+',
+    aka: ['Nicotinamide adenine dinucleotide'],
+    className: 'Coenzyme',
+    evidence: EVIDENCE.ANECDOTAL,
+    strengthOptions: [100, 200, 500, 750, 1000],
+    defaultStrength: 500,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 120, strength: 500, verified: true },
+    dosing: { unit: 'mg', typicalLow: 15, typicalHigh: 100, redline: 300, label: 'NAD+' },
+    ladder: [{ weeks: 1, dose: 50 }, { weeks: 1, dose: 75 }, { weeks: 6, dose: 100 }],
+    notes: [
+      'Subcutaneous NAD+ commonly stings or burns. Injecting slowly and letting the vial come up from fridge temperature is the usual remedy.',
+      'Sensitivity varies a lot between people. Starting well below a suggested schedule is common.',
+    ],
+    risks: ['Flushing, nausea and chest tightness are reported, more so when given quickly.'],
+  },
+  {
+    id: 'bpc-tb500',
+    name: 'BPC-157 / TB-500 blend',
+    aka: ['Wolverine', 'Wolverine stack'],
+    className: 'Repair blend',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [10, 15, 20, 30, 40, 60],
+    defaultStrength: 20,
+    strengthChanged: { from: 10, to: 20 },
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 120, strength: 20, verified: true },
+    dosing: { unit: 'mg', typicalLow: 0.5, typicalHigh: 1.5, redline: 5, label: 'BPC-157 / TB-500 blend' },
+    ladder: [{ weeks: 1, dose: 0.667 }, { weeks: 2, dose: 1.0 }, { weeks: 5, dose: 1.333 }],
+    notes: ['The vial strength is the combined total of both peptides, not each one separately.'],
+    risks: ['No human trial data. Blends make it impossible to attribute any effect or side effect to one component.'],
+  },
+  {
+    id: 'glow',
+    name: 'GLOW blend',
+    aka: ['GHK-Cu / TB-500 / BPC-157'],
+    className: 'Repair and skin blend',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [50, 70, 80, 100],
+    defaultStrength: 70,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 130, strength: 70, verified: true },
+    dosing: { unit: 'mg', typicalLow: 1, typicalHigh: 3, redline: 8, label: 'GLOW blend' },
+    ladder: [{ weeks: 1, dose: 1.4 }, { weeks: 1, dose: 1.867 }, { weeks: 2, dose: 2.333 }],
+    notes: ['Combined strength across all three peptides.'],
+    risks: ['GHK-Cu carries copper. Repeated high-dose use over long periods raises questions about copper load.'],
+  },
+  {
+    id: 'melanotan-1',
+    name: 'Melanotan I',
+    aka: ['Afamelanotide', 'MT-1'],
+    className: 'Melanocortin receptor agonist',
+    evidence: EVIDENCE.APPROVED,
+    strengthOptions: [5, 10, 20],
+    defaultStrength: 10,
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 2,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 45, strength: 10, verified: true },
+    dosing: { unit: 'mg', typicalLow: 0.25, typicalHigh: 1, redline: 2, label: 'Melanotan I' },
+    ladder: [
+      { weeks: 1, dose: 0.25 }, { weeks: 1, dose: 0.5 },
+      { weeks: 1, dose: 0.75 }, { weeks: 5, dose: 1.0 },
+    ],
+    notes: ['Darkening skin is not sun protection. Burn risk is unchanged.'],
+    risks: [
+      'Melanocortin agonists can darken and change existing moles. Any mole that changes shape, colour or size needs a dermatologist, not a wait-and-see.',
+      'Nausea and facial flushing are common in the first week.',
+    ],
+  },
+  {
+    id: 'epitalon',
+    name: 'Epitalon',
+    aka: ['Epithalon', 'Epithalamin', 'AEDG'],
+    className: 'Tetrapeptide',
+    evidence: EVIDENCE.PRECLINICAL,
+    awaitingSheet: true,
+    strengthOptions: [10, 20, 50, 100],
+    defaultStrength: 50,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 2.5,
+    defaultFrequency: 'qd',
+    pricing: { vialPrice: 170, strength: 50, verified: true },
+    dosing: { unit: 'mg', typicalLow: 5, typicalHigh: 10, redline: 50, label: 'Epitalon' },
+    cycle: { daysOn: 20, everyDays: 182.6, label: '20 days on, twice a year' },
+    ladder: [{ weeks: 3, dose: 5 }],
+    notes: [
+      'Run as a course rather than continuously: 5 mg daily for 20 days, repeated about every six months. A 20 day course at 5 mg is 100 mg total, which is two 50 mg bottles.',
+      'No protocol sheet for this one yet - the ladder shown is the commonly circulated range, so treat it as a placeholder until the real sheet arrives.',
+    ],
+    risks: ['Human evidence is limited and comes from a small number of studies.'],
+  },
+  {
+    id: 'semaglutide',
+    name: 'Semaglutide',
+    aka: ['Ozempic', 'Wegovy'],
+    className: 'GLP-1 receptor agonist',
+    evidence: EVIDENCE.APPROVED,
+    strengthOptions: [2, 3, 5, 10, 15, 20, 30],
+    defaultStrength: 10,
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 2,
+    defaultFrequency: 'qw',
+    dosing: { unit: 'mg', typicalLow: 0.25, typicalHigh: 2.4, redline: 2.4, minDaysBetweenIncreases: 28, label: 'Semaglutide' },
+    ladder: [
+      { weeks: 4, dose: 0.25 }, { weeks: 4, dose: 0.5 }, { weeks: 4, dose: 1.0 },
+      { weeks: 4, dose: 1.7 }, { weeks: 4, dose: 2.4 },
+    ],
+    notes: ['The approved escalation holds each step for four weeks. 2.4 mg weekly is the licensed ceiling for weight management.'],
+    risks: [
+      'Contraindicated with a personal or family history of medullary thyroid carcinoma or MEN2.',
+      'Hypoglycaemia risk rises sharply alongside insulin or a sulfonylurea.',
+      'Should not be used in pregnancy.',
+    ],
+  },
+  {
+    id: 'tirzepatide',
+    name: 'Tirzepatide',
+    aka: ['Mounjaro', 'Zepbound'],
+    className: 'Dual agonist (GIP / GLP-1)',
+    evidence: EVIDENCE.APPROVED,
+    strengthOptions: [5, 10, 15, 20, 30, 40, 60],
+    defaultStrength: 30,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qw',
+    dosing: { unit: 'mg', typicalLow: 2.5, typicalHigh: 15, redline: 15, minDaysBetweenIncreases: 28, label: 'Tirzepatide' },
+    ladder: [
+      { weeks: 4, dose: 2.5 }, { weeks: 4, dose: 5 }, { weeks: 4, dose: 7.5 },
+      { weeks: 4, dose: 10 }, { weeks: 4, dose: 12.5 }, { weeks: 4, dose: 15 },
+    ],
+    notes: ['Approved escalation moves in 2.5 mg steps with at least four weeks at each. 15 mg weekly is the ceiling.'],
+    risks: [
+      'Contraindicated with a personal or family history of medullary thyroid carcinoma or MEN2.',
+      'Hypoglycaemia risk rises sharply alongside insulin or a sulfonylurea.',
+      'Should not be used in pregnancy.',
+    ],
+  },
+  {
+    id: 'bpc-157',
+    name: 'BPC-157',
+    aka: [],
+    className: 'Repair peptide',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [5, 10, 20],
+    defaultStrength: 10,
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    dosing: { unit: 'mcg', typicalLow: 200, typicalHigh: 500, redline: 1000, label: 'BPC-157' },
+    ladder: [{ weeks: 4, dose: 0.25 }, { weeks: 4, dose: 0.5 }],
+    notes: [],
+    risks: ['No human trial data.'],
+  },
+  {
+    id: 'tb-500',
+    name: 'TB-500',
+    aka: ['Thymosin beta-4 fragment'],
+    className: 'Repair peptide',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [2, 5, 10, 20],
+    defaultStrength: 10,
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 3,
+    defaultFrequency: '2xw',
+    dosing: { unit: 'mg', typicalLow: 2, typicalHigh: 2.5, redline: 10, label: 'TB-500' },
+    ladder: [{ weeks: 4, dose: 2.5 }, { weeks: 4, dose: 2 }],
+    notes: ['Usually run as a loading phase twice weekly, then tapered.'],
+    risks: ['No human trial data.'],
+  },
+  {
+    id: 'ipamorelin',
+    name: 'Ipamorelin',
+    aka: [],
+    className: 'Growth hormone secretagogue',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [2, 5, 10, 15, 20],
+    defaultStrength: 10,
+    strengthUnit: 'mg',
+    vialCapacityMl: 3,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    dosing: { unit: 'mcg', typicalLow: 100, typicalHigh: 300, redline: 1000, label: 'Ipamorelin' },
+    ladder: [{ weeks: 4, dose: 0.2 }, { weeks: 4, dose: 0.3 }],
+    notes: [],
+    risks: ['Head rush and flushing shortly after injection are commonly reported.'],
+  },
+  {
+    id: 'ghk-cu',
+    name: 'GHK-Cu',
+    aka: ['Copper peptide'],
+    className: 'Copper tripeptide',
+    evidence: EVIDENCE.PRECLINICAL,
+    strengthOptions: [10, 20, 50, 100],
+    defaultStrength: 50,
+    strengthUnit: 'mg',
+    vialCapacityMl: 5,
+    defaultDiluentMl: 3,
+    defaultFrequency: 'qd',
+    dosing: { unit: 'mg', typicalLow: 1, typicalHigh: 2, redline: 5, label: 'GHK-Cu' },
+    ladder: [{ weeks: 4, dose: 1 }, { weeks: 4, dose: 2 }],
+    notes: [],
+    risks: ['Carries copper. Cumulative copper load is the open question with sustained use.'],
+  },
+];
+
+export function peptide(id) {
+  return PEPTIDES.find((p) => p.id === id) ?? null;
+}
+
+export function searchPeptides(q) {
+  const term = (q ?? '').trim().toLowerCase();
+  if (!term) return PEPTIDES;
+  return PEPTIDES.filter((p) =>
+    [p.name, p.className, ...(p.aka ?? [])].join(' ').toLowerCase().includes(term)
+  );
+}
+
+/**
+ * Protocol sheets as they were circulated, kept so the app can show
+ * "the sheet says N units" next to "your bottle needs M units".
+ *
+ * Personal details from the original messages are deliberately not stored here.
+ */
+export const SHEET_PROTOCOLS = [
+  { peptideId: 'retatrutide', sheetStrength: null, sheetDiluentMl: 4, frequency: 'q6d', note: 'Sheet gives 400 units of water and a 1 mg starting dose but never states the bottle strength - the units it implies depend entirely on that number.' },
+  { peptideId: 'mots-c', sheetStrength: 10, sheetDiluentMl: 3, frequency: 'qd', note: 'Written for a 10 mg vial. Bottles now ship at 40 mg in an identical-looking bottle - the label is the only difference.' },
+  { peptideId: 'ss-31', sheetStrength: 50, sheetDiluentMl: 3, frequency: 'qd', note: 'Written for a 50 mg vial.' },
+  { peptideId: 'nad', sheetStrength: 500, sheetDiluentMl: 3, frequency: 'qd', note: 'Written for a 500 mg vial.' },
+  { peptideId: 'bpc-tb500', sheetStrength: 10, sheetDiluentMl: 3, frequency: 'qd', note: 'Written for a 10 mg blend vial. Bottles now ship at 20 mg, so every unit count on the sheet is double what it should be.' },
+  { peptideId: 'glow', sheetStrength: 70, sheetDiluentMl: 3, frequency: 'qd', note: 'Written for a 70 mg blend vial.' },
+  { peptideId: 'melanotan-1', sheetStrength: 10, sheetDiluentMl: 2, frequency: 'qd', note: 'Written for a 10 mg vial.' },
+];
+
+export function sheetFor(peptideId) {
+  return SHEET_PROTOCOLS.find((s) => s.peptideId === peptideId) ?? null;
+}

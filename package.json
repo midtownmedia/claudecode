@@ -1,0 +1,16 @@
+{
+  "name": "peptide-dosing-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reconstitution calculator, bottle-strength checker, dose log and running cost for injectable peptide protocols. Static, offline, no backend.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "node --test --watch test/*.test.js",
+    "serve": "node --run serve:py || python3 -m http.server 8080 --directory public",
+    "serve:py": "python3 -m http.server 8080 --directory public"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

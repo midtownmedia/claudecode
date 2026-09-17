@@ -1,0 +1,26 @@
+[build]
+  publish = "public"
+  command = ""
+
+# No build step: the app is plain ES modules and ships as-is.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+    # No connect-src beyond 'self': the app has no backend and must not gain one
+    # by accident. Health data stays in the browser.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
