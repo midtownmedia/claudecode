@@ -74,18 +74,20 @@ export const PEPTIDES = [
     strengthChanged: { from: 10, to: 40 },
     strengthUnit: 'mg',
     vialCapacityMl: 5,
-    // 5 mL puts 0.32 mg on exactly 4 units, which is the chosen starting dose.
-    defaultDiluentMl: 5,
+    // 4 mL puts one unit at exactly 0.1 mg, so every step of the protocol lands
+    // on a whole mark and units divided by ten is the dose in mg.
+    defaultDiluentMl: 4,
     defaultFrequency: 'qd',
     pricing: { vialPrice: 275, strength: 40, verified: true },
     dosing: { unit: 'mg', typicalLow: 0.2, typicalHigh: 1, redline: 10, label: 'MOTS-c' },
     ladder: [
-      { weeks: 2, dose: 0.32 }, { weeks: 2, dose: 0.4 }, { weeks: 2, dose: 0.6 },
+      { weeks: 2, dose: 0.2 }, { weeks: 2, dose: 0.4 }, { weeks: 2, dose: 0.6 },
       { weeks: 2, dose: 0.8 }, { weeks: 2, dose: 1.0 },
     ],
     notes: [
       'Circulated sheets were written for a 10 mg vial. The 40 mg bottle is physically identical, so the label is the only way to tell them apart.',
-      'A 40 mg bottle is oversized for sub-milligram doses. With the full 5 mL of bac water one unit is 0.08 mg, which puts the 0.32 mg starting dose on exactly 4 units. Use a 0.3 mL / 30 unit syringe so those marks are as wide as possible.',
+      'Reconstitute a 40 mg bottle with 4 mL of bac water. That makes one unit exactly 0.1 mg, so the whole protocol lands on whole marks and units divided by ten is the dose: 2 units is 0.2 mg, 10 units is 1 mg.',
+      'The 0.2 mg starting dose is only 2 units, so draw it on a 0.3 mL / 30 unit syringe where the marks are widest. More bac water does not help here - at 5 mL the dose falls on 2.5 units instead.',
       'Well tolerated by comparison with the incretins - increased energy is the usual reported effect, which is why it is taken in the morning.',
     ],
     risks: ['Human safety data is thin. Preclinical work only.'],

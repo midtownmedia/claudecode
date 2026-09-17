@@ -141,14 +141,14 @@ export function checkFirstDose(doseMg, peptide, { hasHistory = false } = {}) {
     return [{
       level: LEVEL.DANGER,
       code: 'first-dose-over-max',
-      message: `${formatMass(doseMg)} is too much for a first dose of ${peptide.name}. The ceiling for a first dose is ${formatMass(fd.max)}, and ${formatMass(fd.recommended)} is the sensible place to start. ${fd.note}`,
+      message: `If this is your first dose of ${peptide.name}, ${formatMass(doseMg)} is too much: the ceiling for a first dose is ${formatMass(fd.max)} and ${formatMass(fd.recommended)} is the sensible place to start. If you have worked up to this on the ladder, log a dose or save a protocol and this will stop asking.`,
     }];
   }
   if (doseMg > fd.recommendedMax) {
     return [{
       level: LEVEL.WARN,
       code: 'first-dose-high',
-      message: `For a first dose, ${formatMass(fd.recommended)} to ${formatMass(fd.recommendedMax)} is the range to gauge tolerance in. ${formatMass(doseMg)} is at the top of what is reasonable to begin with.`,
+      message: `If this is your first dose, ${formatMass(fd.recommended)} is where to gauge tolerance. ${formatMass(doseMg)} is at the top of what is reasonable to begin with.`,
     }];
   }
   return [];

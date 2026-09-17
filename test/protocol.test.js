@@ -227,3 +227,31 @@ test('no bottle is asked to hold more than 5 mL of bac water', () => {
     assert.ok(p.defaultDiluentMl <= MAX_BAC_WATER_ML, `${p.name}: default water over ${MAX_BAC_WATER_ML} mL`);
   }
 });
+
+test('MOTS-c keeps its original protocol, with the water chosen to suit it', () => {
+  const p = peptide('mots-c');
+  assert.deepEqual(p.ladder.map((l) => l.dose), [0.2, 0.4, 0.6, 0.8, 1.0]);
+  assert.equal(p.defaultDiluentMl, 4);
+
+  // One unit is exactly 0.1 mg, so every step lands on a whole mark.
+  for (const step of p.ladder) {
+    const units = doseToUnits({ strength: 40, diluentMl: p.defaultDiluentMl, dose: step.dose }).units;
+    assert.ok(Math.abs(units - Math.round(units)) < 1e-9, `${step.dose} mg lands on ${units} units`);
+    assert.ok(Math.abs(units - step.dose * 10) < 1e-9, 'units divided by ten should be the dose in mg');
+  }
+
+  // The 0.2 mg start sits exactly on the floor for a compound of this risk level.
+  const floor = smallestMeasurableDose({ strength: 40, diluentMl: 4, minUnits: 2 });
+  assert.ok(p.ladder[0].dose >= floor - 1e-9);
+  assert.ok(!p.highRisk, 'MOTS-c is not in the high-risk group');
+});
+
+test('the first-dose guard steps aside once a protocol is saved', () => {
+  const p = peptide('retatrutide');
+  // Cold start: a mid-ladder dose is flagged, because it may genuinely be a first dose.
+  assert.equal(checkFirstDose(4, p)[0].level, 'danger');
+  // But the message says so conditionally rather than asserting it outright.
+  assert.match(checkFirstDose(4, p)[0].message, /If this is your first dose/);
+  // And any established history silences it.
+  assert.equal(checkFirstDose(4, p, { hasHistory: true }).length, 0);
+});

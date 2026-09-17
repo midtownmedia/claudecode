@@ -29,7 +29,11 @@ export function calculatorView(ctx) {
     syringe: syr, volumeMl: calc.volumeMl, diluentMl: st.diluentMl, vialCapacityMl: p.vialCapacityMl,
   });
   const clinical = checkDose(calc.requestedDose, p);
-  const hasHistory = ctx.state.logs.some((l) => l.peptideId === p.id);
+  // Someone mid-ladder should not be shouted at. A logged dose or a saved
+  // protocol for this compound both mean they are past their first one.
+  const hasHistory =
+    ctx.state.logs.some((l) => l.peptideId === p.id) ||
+    ctx.state.protocols.some((pr) => pr.peptideId === p.id);
   const first = checkFirstDose(calc.requestedDose, p, { hasHistory });
   const floorDose = smallestMeasurableDose({
     strength: st.strength, strengthUnit: p.strengthUnit, diluentMl: st.diluentMl,
@@ -49,6 +53,7 @@ export function calculatorView(ctx) {
     vialCapacityMl: Math.min(p.vialCapacityMl, MAX_BAC_WATER_ML),
     syringeCapacityUnits: syr.capacityUnits,
     criticalDose: p.ladder?.[0]?.dose ?? null,
+    minCriticalUnits: p.highRisk ? 4 : 2,
   });
   const best = rec[0];
   const better = best && Math.abs(best.diluentMl - st.diluentMl) > 1e-6 ? best : null;
