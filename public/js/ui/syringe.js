@@ -47,6 +47,10 @@ export function syringeSvg({ units, syringe, caption, tone = 'ok' }) {
     svg.append(s('rect', { x: x0, y: barrelY, width: Math.max(2, fillX - x0), height: barrelH, rx: 4, class: 'sy-fill' }));
   }
 
+  // Plunger.
+  svg.append(s('rect', { x: fillX - 2, y: barrelY - 6, width: 4, height: barrelH + 12, class: 'sy-plunger' }));
+  svg.append(s('rect', { x: fillX, y: barrelY + 12, width: Math.max(0, x1 - fillX), height: barrelH - 24, class: 'sy-rod' }));
+
   // Graduations. Long marks and printed numbers are deliberately separate: on a
   // 100 unit barrel at phone width, numbering every long mark crowds them into
   // an unreadable row, so every other one carries the number.
@@ -68,9 +72,10 @@ export function syringeSvg({ units, syringe, caption, tone = 'ok' }) {
     }
   }
 
-  // Plunger.
-  svg.append(s('rect', { x: fillX - 2, y: barrelY - 6, width: 4, height: barrelH + 12, class: 'sy-plunger' }));
-  svg.append(s('rect', { x: fillX, y: barrelY + 12, width: Math.max(0, x1 - fillX), height: barrelH - 24, class: 'sy-rod' }));
+  // Graduations go on last: the plunger rod is opaque, and on a real syringe
+  // the numbers are printed on the outside of the barrel where the rod cannot
+  // hide them. Drawing them earlier blanks the scale to the right of the
+  // plunger, which is most of it on a small draw.
 
   // Pointer and value.
   svg.append(s('path', {

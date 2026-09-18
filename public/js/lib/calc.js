@@ -185,6 +185,9 @@ export function compareVials({
  * separate from the clinical dose-range checks in safety.js.
  */
 export function drawWarnings({ units, roundedUnits, errorPct, syringe, volumeMl, diluentMl, vialCapacityMl }) {
+  // Quote the mark the person will actually pull to, so the warning and the
+  // headline above it do not show two different numbers.
+  const shown = Number.isFinite(roundedUnits) ? roundedUnits : units;
   const out = [];
   if (!Number.isFinite(units)) {
     out.push({ level: 'info', code: 'incomplete', message: 'Fill in the vial strength, diluent volume and dose.' });
@@ -198,20 +201,20 @@ export function drawWarnings({ units, roundedUnits, errorPct, syringe, volumeMl,
     out.push({
       level: 'danger',
       code: 'over-capacity',
-      message: `${round(units)} units will not fit in a ${syringe.label}. Use less diluent, or split the dose across more than one injection.`,
+      message: `${round(shown)} units will not fit in a ${syringe.label}. Use less diluent, or split the dose across more than one injection.`,
     });
   }
   if (units < 2) {
     out.push({
       level: 'warn',
       code: 'too-small',
-      message: `${round(units)} units is a sliver of liquid and very hard to measure accurately. Use more diluent so the dose lands on a bigger mark.`,
+      message: `${round(shown)} units is a sliver of liquid and very hard to measure accurately. Use more bac water so the dose lands on a bigger mark.`,
     });
   } else if (units < 5) {
     out.push({
       level: 'info',
       code: 'small',
-      message: `${round(units)} units is a small draw. A little more diluent would make it easier to read.`,
+      message: `${round(shown)} units is a small draw. A little more bac water would make it easier to read.`,
     });
   }
   if (Number.isFinite(errorPct) && Math.abs(errorPct) >= 5) {
