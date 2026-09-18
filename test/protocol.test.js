@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { costBreakdown, totalBurn, amortiseCycle, vialsPerCycle, spendSummary, dailyTotal } from '../public/js/lib/cost.js';
+import { costBreakdown, totalBurn, amortiseCycle, vialsPerCycle, spendSummary, dailyTotal, formatMoney, formatMoneyExact } from '../public/js/lib/cost.js';
 import { dosesPerWeek, nextDoseAt, titrationStatus, vialExpiry, vialDuration, BAC_WATER, STERILE_WATER_CAUTION } from '../public/js/lib/schedule.js';
 import { migrate, suggestSite, importJson, exportJson, DEFAULT_STATE, SITES } from '../public/js/lib/store.js';
 import { checkDose, checkEscalation, checkFirstDose } from '../public/js/lib/safety.js';
@@ -328,4 +328,38 @@ test('NAD+ also offers the split, for the same reason', () => {
   const p = peptide('nad');
   assert.ok(p.splitDose, 'NAD+ is commonly reacted to and should offer it');
   assert.equal(p.splitDose.parts, 2);
+});
+
+test('the per-dose price breaks into shares that add back up', () => {
+  const b = costBreakdown({
+    vialPrice: 230, vialsPerOrder: 1, shipping: 0,
+    bacPrice: 30, bacBottleMl: 30, diluentMl: 3,
+    syringeBoxPrice: 20, syringesPerBox: 100, syringesPerDose: 1,
+    otherPerDose: 0.05, dosesPerVial: 5, freqId: 'qd',
+  });
+  close(b.vialSharePerDose, 46);        // 230 / 5
+  close(b.bacSharePerDose, 0.6);        // 3 mL at $1/mL, over 5 doses
+  close(b.syringeSharePerDose, 0.2);    // 20 / 100
+  close(b.otherPerDose, 0.05);
+  // The parts must reconstruct the total, or the breakdown is lying.
+  close(b.vialSharePerDose + b.bacSharePerDose + b.syringeSharePerDose + b.otherPerDose, b.perDose);
+  close(b.perDose, 46.85);
+});
+
+test('the bottle dominates the per-dose price', () => {
+  // Worth asserting: it is why bac water is not worth economising on.
+  const b = costBreakdown({
+    vialPrice: 230, bacPrice: 30, bacBottleMl: 30, diluentMl: 3,
+    syringeBoxPrice: 20, syringesPerBox: 100, dosesPerVial: 5, freqId: 'qd',
+  });
+  assert.ok(b.vialSharePerDose / b.perDose > 0.97, 'the bottle should be almost all of it');
+});
+
+test('breakdown money is shown to the penny so the column adds up', () => {
+  assert.equal(formatMoneyExact(46, 'USD', 'en-US'), '$46.00');
+  assert.equal(formatMoneyExact(46.8, 'USD', 'en-US'), '$46.80');
+  assert.equal(formatMoneyExact(0.6, 'USD', 'en-US'), '$0.60');
+  assert.equal(formatMoneyExact(NaN), '--');
+  // The headline formatter still rounds, which is fine for a summary.
+  assert.equal(formatMoney(46.8, 'USD', 'en-US'), '$47');
 });

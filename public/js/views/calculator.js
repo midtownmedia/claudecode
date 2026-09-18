@@ -1,12 +1,19 @@
 /** "What do I draw?" -- the screen most people will only ever use. */
 
-import { el, field, select, number, warnings, stat, fmtNum, banner } from '../ui/dom.js';
+import { el, field, select, number, warnings, stat, fmtNum, banner, detailsBox } from '../ui/dom.js';
 import { syringeCard } from '../ui/syringe.js';
 import { PEPTIDES, peptide, sheetFor } from '../data/peptides.js';
 import { SYRINGES, syringe, bestSyringeFor } from '../data/syringes.js';
 import { doseToUnits, suggestDiluents, drawWarnings, unitsToMl, mlToUnits, smallestMeasurableDose, splitDraw, scaleBetween, describeScale, MAX_BAC_WATER_ML } from '../lib/calc.js';
 import { checkDose, checkFirstDose, checkMeasurability } from '../lib/safety.js';
 import { formatMass } from '../lib/units.js';
+import { costBreakdown, formatMoney, formatMoneyExact } from '../lib/cost.js';
+import { costLines } from '../ui/costlines.js';
+import { frequency } from '../lib/schedule.js';
+
+function seededPrice(p, strength) {
+  return p?.pricing && Math.abs(p.pricing.strength - strength) < 1e-9 ? p.pricing.vialPrice : null;
+}
 
 export function calculatorView(ctx) {
   const st = ctx.ui.calc ??= {};
@@ -17,6 +24,8 @@ export function calculatorView(ctx) {
   st.diluentId ??= 'bacteriostatic';
   st.syringeId ??= ctx.state.settings.syringeId ?? 'u100-10';
   if (st.dose == null) st.dose = p.ladder?.[0]?.dose ?? 1;
+  if (st.vialPrice === undefined) st.vialPrice = seededPrice(p, st.strength);
+  const sup = ctx.state.settings.supplies ??= { bacPrice: 0, bacBottleMl: 30, syringeBoxPrice: 0, syringesPerBox: 100 };
 
   const syr = syringe(st.syringeId);
   const calc = doseToUnits({
@@ -88,6 +97,19 @@ export function calculatorView(ctx) {
     };
   }
 
+  const freq = frequency(p.defaultFrequency);
+  const money = (v) => formatMoney(v, ctx.state.settings.currency ?? 'USD');
+  // The per-dose figure sits directly above a breakdown that adds up to it, so
+  // it is shown to the penny; the longer horizons can round.
+  const moneyExact = (v) => formatMoneyExact(v, ctx.state.settings.currency ?? 'USD');
+  const spend = st.vialPrice > 0
+    ? costBreakdown({
+      vialPrice: st.vialPrice, dosesPerVial: calc.dosesPerVial, freqId: p.defaultFrequency,
+      bacPrice: sup.bacPrice, bacBottleMl: sup.bacBottleMl, diluentMl: st.diluentMl,
+      syringeBoxPrice: sup.syringeBoxPrice, syringesPerBox: sup.syringesPerBox,
+    })
+    : null;
+
   const split = p.splitDose
     ? splitDraw({ units: calc.roundedUnits, dose: calc.actualDose, parts: p.splitDose.parts })
     : null;
@@ -149,6 +171,7 @@ export function calculatorView(ctx) {
             Object.assign(st, {
               peptideId: v, strength: next.defaultStrength,
               diluentMl: next.defaultDiluentMl ?? 3, dose: next.ladder?.[0]?.dose ?? 1,
+              vialPrice: seededPrice(next, next.defaultStrength),
             });
             ctx.render();
           })),
@@ -157,8 +180,12 @@ export function calculatorView(ctx) {
             select(
               [...new Set([...(p.strengthOptions ?? []), st.strength])].sort((a, b) => a - b)
                 .map((v) => ({ value: v, label: `${v} ${p.strengthUnit}` })),
-              st.strength, (v) => { st.strength = Number(v); ctx.render(); }),
-            number(st.strength, (v) => { st.strength = v; ctx.render(); },
+              st.strength, (v) => {
+                st.strength = Number(v);
+                st.vialPrice = seededPrice(p, st.strength);
+                ctx.render();
+              }),
+            number(st.strength, (v) => { st.strength = v; st.vialPrice = seededPrice(p, v); ctx.render(); },
               { class: 'narrow', min: 0, step: 'any', 'aria-label': 'Custom bottle strength' })),
           'Read this off the label, not off the protocol sheet.'),
         field('Bac water added',
@@ -168,6 +195,11 @@ export function calculatorView(ctx) {
             el('span', { class: 'equals' },
               `= ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units`)),
           `1 mL = 100 units on a U-100 syringe, so ${fmtNum(st.diluentMl ?? 0, 2)} mL is ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units if you measure it with one. A bottle takes ${MAX_BAC_WATER_ML} mL at most.`),
+        field('Bottle price',
+          el('div', { class: 'row' },
+            el('span', { class: 'suffix' }, ctx.state.settings.currency ?? 'USD'),
+            number(st.vialPrice, (v) => { st.vialPrice = v; ctx.render(); }, { min: 0, step: 'any' })),
+          'What one bottle costs, so the maths below can tell you what a dose is worth.'),
         field('Syringe', select(
           SYRINGES.map((x) => ({ value: x.id, label: x.label })), st.syringeId,
           (v) => { st.syringeId = v; ctx.state.settings.syringeId = v; ctx.save(); ctx.render(); })),
@@ -205,6 +237,30 @@ export function calculatorView(ctx) {
         stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--'),
         stat('Smallest this bottle can do', formatMass(floorDose),
           atMaxWater ? 'at full dilution' : `at ${fmtNum(st.diluentMl, 2)} mL`)),
+      (spend
+        ? el('div', { class: 'spendstrip' },
+          el('div', { class: 'spend-main' }, `${moneyExact(spend.perDose)} a dose`),
+          el('div', { class: 'spend-rest' },
+            `${money(spend.perDay)} a day · ${money(spend.perMonth)} a month · ${money(spend.perYear)} a year`),
+          el('div', { class: 'spend-note' },
+            `${calc.dosesPerVial} doses in a ${st.strength} ${p.strengthUnit} bottle at ${money(st.vialPrice)}, `
+            + `taken ${freq.label.toLowerCase()}`),
+          detailsBox(ctx, 'calc-spend', 'Where that goes', { class: 'spend-detail' },
+            costLines({
+              breakdown: spend, currency: ctx.state.settings.currency ?? 'USD',
+              dosesPerVial: calc.dosesPerVial,
+              strength: st.strength, strengthUnit: p.strengthUnit, diluentMl: st.diluentMl,
+            }),
+            el('div', { class: 'grid' },
+              field('Bac water bottle',
+                number(sup.bacPrice, (v) => { sup.bacPrice = v ?? 0; ctx.save(); ctx.render(); }, { min: 0, step: 'any' })),
+              field('Its size (mL)',
+                number(sup.bacBottleMl, (v) => { sup.bacBottleMl = v ?? 30; ctx.save(); ctx.render(); }, { min: 1, step: 'any' })),
+              field('Box of syringes',
+                number(sup.syringeBoxPrice, (v) => { sup.syringeBoxPrice = v ?? 0; ctx.save(); ctx.render(); }, { min: 0, step: 'any' })),
+              field('Syringes per box',
+                number(sup.syringesPerBox, (v) => { sup.syringesPerBox = v ?? 100; ctx.save(); ctx.render(); }, { min: 1, step: 1 })))))
+        : null),
       warnings(all),
       st.diluentMl > MAX_BAC_WATER_ML
         ? banner('danger', `${fmtNum(st.diluentMl, 2)} mL will not fit. A bottle takes about ${MAX_BAC_WATER_ML} mL of bac water at most.`)
@@ -253,8 +309,7 @@ export function calculatorView(ctx) {
           : banner('warn', `${fmtNum(calc.roundedUnits, 2)} units does not halve evenly, so each half is rounded to ${fmtNum(split.perPartUnits, 2)} units and the day comes to ${formatMass(split.totalDose)}.`))
       : null),
 
-    el('details', { class: 'card' },
-      el('summary', {}, 'Show me the maths'),
+    detailsBox(ctx, 'calc-maths', 'Show me the maths', { class: 'card' },
       el('ol', { class: 'maths' },
         el('li', {}, `The bottle holds ${st.strength} ${p.strengthUnit} of powder.`),
         el('li', {}, `You added ${fmtNum(st.diluentMl, 3)} mL of water, so the liquid is ${fmtNum(calc.concentration, 4)} mg per mL.`),

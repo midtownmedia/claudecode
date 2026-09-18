@@ -26,11 +26,75 @@ export function clear(node) {
   return node;
 }
 
-export function field(label, control, hint) {
-  return el('label', { class: 'field' },
+/**
+ * A labelled control.
+ *
+ * Every form control inside gets a stable key derived from its label, so that
+ * focus and the half-typed text can be put back after a re-render. Without it,
+ * rebuilding the DOM on each keystroke throws the caret out of the field and
+ * you cannot type "12.5" at all. `scope` distinguishes repeated cards that
+ * share label text, such as one per protocol.
+ */
+export function field(label, control, hint, scope = '') {
+  const node = el('label', { class: 'field' },
     el('span', { class: 'field-label' }, label),
     control,
     hint ? el('span', { class: 'field-hint' }, hint) : null);
+
+  const controls = node.querySelectorAll('input, select, textarea');
+  controls.forEach((c, i) => {
+    c.dataset.fkey = `${scope}|${label}|${i}`;
+  });
+  return node;
+}
+
+/**
+ * A disclosure whose open state survives a re-render, for the same reason.
+ */
+export function detailsBox(ctx, key, summaryText, props, ...children) {
+  const open = (ctx.ui.open ??= {});
+  return el('details', {
+    ...props,
+    // `open` is set before the listener is attached so restoring it does not
+    // immediately fire the handler.
+    open: !!open[key],
+    ontoggle: (e) => { open[key] = e.target.open; },
+  }, el('summary', {}, summaryText), ...children);
+}
+
+/** Remember where the caret was, so a re-render can put it back. */
+export function captureFocus() {
+  const a = document.activeElement;
+  if (!a?.dataset?.fkey) return null;
+  let sel = null;
+  try {
+    sel = { start: a.selectionStart, end: a.selectionEnd };
+  } catch {
+    sel = null; // number inputs refuse selection access in some browsers
+  }
+  return { fkey: a.dataset.fkey, value: a.value, sel };
+}
+
+export function restoreFocus(snap) {
+  if (!snap) return;
+  let node;
+  try {
+    node = document.querySelector(`[data-fkey="${CSS.escape(snap.fkey)}"]`);
+  } catch {
+    return;
+  }
+  if (!node) return;
+  // Put back exactly what was typed. State holds a number, so a half-finished
+  // "12." would otherwise come back as "12" and swallow the decimal point.
+  if (node.value !== snap.value) node.value = snap.value;
+  node.focus({ preventScroll: true });
+  if (snap.sel) {
+    try {
+      node.setSelectionRange(snap.sel.start, snap.sel.end);
+    } catch {
+      /* not supported on this input type */
+    }
+  }
 }
 
 export function select(options, value, onChange, props = {}) {
@@ -42,10 +106,29 @@ export function select(options, value, onChange, props = {}) {
   return node;
 }
 
+/**
+ * A numeric field, deliberately NOT type="number".
+ *
+ * A number input sanitises its own value: mid-way through typing "12.5" the
+ * browser reports "" for "12.", so the decimal point cannot survive a
+ * re-render, and a stray scroll wheel silently changes the dose. A text input
+ * with a decimal keypad keeps exactly what was typed and leaves the parsing
+ * to us.
+ */
 export function number(value, onInput, props = {}) {
+  const { class: cls, ...rest } = props;
   return el('input', {
-    type: 'number', inputmode: 'decimal', value: value ?? '', ...props,
-    oninput: (e) => onInput(e.target.value === '' ? null : Number(e.target.value)),
+    type: 'text', inputmode: 'decimal', autocomplete: 'off', spellcheck: false,
+    class: ['num', cls].filter(Boolean).join(' '),
+    value: value ?? '', ...rest,
+    oninput: (e) => {
+      const raw = e.target.value.trim();
+      if (raw === '') return onInput(null);
+      const n = Number.parseFloat(raw);
+      // A half-typed "12." parses to 12, which is what the rest of the app
+      // should see; the field keeps showing what was actually typed.
+      onInput(Number.isFinite(n) ? n : null);
+    },
   });
 }
 

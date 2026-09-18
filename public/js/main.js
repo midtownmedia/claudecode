@@ -1,6 +1,6 @@
 /** App shell: state, tabs, first-run acknowledgement, backup. */
 
-import { el, $, clear, banner } from './ui/dom.js';
+import { el, $, clear, banner, captureFocus, restoreFocus } from './ui/dom.js';
 import { load, save, uid, exportJson, importJson, DEFAULT_STATE, suggestSite } from './lib/store.js';
 import { calculatorView } from './views/calculator.js';
 import { swapView } from './views/swap.js';
@@ -84,6 +84,9 @@ function gate() {
 
 function render() {
   const root = $('#app');
+  // Rebuilding the whole tree destroys the focused field, so the caret is
+  // captured first and put back once the new tree is in place.
+  const focus = captureFocus();
   clear(root);
 
   if (!ctx.state.settings.acknowledgedAt) {
@@ -109,6 +112,8 @@ function render() {
         'Not medical advice. Nothing here leaves your browser. ',
         el('a', { href: '#reference', onclick: () => { ctx.tab = 'reference'; } }, 'Red flags and handling')),
     ));
+
+  restoreFocus(focus);
 }
 
 window.addEventListener('hashchange', () => {

@@ -63,6 +63,12 @@ export function costBreakdown({
     consumablesPerDose,
     perVialTotal,
     vialPartPerDose,
+    // Split out so the per-dose price can be shown as its parts rather than
+    // one number people have to take on trust.
+    vialSharePerDose: dosesPerVial > 0 ? landedVial / dosesPerVial : NaN,
+    bacSharePerDose: dosesPerVial > 0 ? bacPerVial / dosesPerVial : NaN,
+    syringeSharePerDose: syringeEach * syringesPerDose,
+    otherPerDose,
     perDose,
     perWeek: Number.isFinite(perDay) ? perDay * 7 : NaN,
     perDay,
@@ -106,6 +112,24 @@ export function spendSummary(purchases = [], sinceDays = null) {
     spanDays,
     averagePerDay: spanDays ? total / spanDays : NaN,
   };
+}
+
+/**
+ * Money to the penny, for anything that has to visibly add up.
+ *
+ * The headline formatter drops the pennies above ten, which is right for a
+ * summary but makes a breakdown look wrong: 46 + 0.60 + 0.20 rendered as
+ * "46, 0.60, 0.20, 47" invites people to distrust the whole figure.
+ */
+export function formatMoneyExact(value, currency = 'USD', locale = undefined) {
+  if (!Number.isFinite(value)) return '--';
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${currency} ${value.toFixed(2)}`;
+  }
 }
 
 export function formatMoney(value, currency = 'USD', locale = undefined) {

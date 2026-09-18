@@ -74,32 +74,32 @@ function protocolCard(ctx, pr) {
       field('Label', el('input', {
         type: 'text', value: pr.nickname, placeholder: p.name,
         oninput: (e) => { pr.nickname = e.target.value; ctx.save(); },
-      }), 'Whose protocol is this?'),
+      }), 'Whose protocol is this?', pr.id),
       field('Compound', select(PEPTIDES.map((x) => ({ value: x.id, label: x.name })), pr.peptideId,
         (v) => {
           const n = peptide(v);
           Object.assign(pr, { peptideId: v, strength: n.defaultStrength, diluentMl: n.defaultDiluentMl ?? 3,
             dose: n.ladder?.[0]?.dose ?? 1, frequency: n.defaultFrequency ?? 'qd' });
           ctx.save(); ctx.render();
-        })),
+        }), pr.id),
       field('Bottle strength', el('div', { class: 'row' },
         select([...new Set([...(p.strengthOptions ?? []), pr.strength])].sort((a, b) => a - b)
           .map((v) => ({ value: v, label: `${v} ${p.strengthUnit}` })), pr.strength,
         (v) => set('strength', Number(v))),
-        number(pr.strength, (v) => set('strength', v), { class: 'narrow', min: 0, step: 'any', 'aria-label': 'Custom strength' }))),
+        number(pr.strength, (v) => set('strength', v), { class: 'narrow', min: 0, step: 'any', 'aria-label': 'Custom strength' })), pr.id),
       field('Bac water', el('div', { class: 'row' },
         number(pr.diluentMl, (v) => set('diluentMl', v), { min: 0, step: 'any' }),
-        el('span', { class: 'suffix' }, 'mL'))),
+        el('span', { class: 'suffix' }, 'mL')), pr.id),
       field('Mixed on', el('input', {
         type: 'date', value: pr.openedAt ?? '', onchange: (e) => set('openedAt', e.target.value),
-      })),
+      }), pr.id),
       field('Dose', el('div', { class: 'row' },
         number(pr.dose, (v) => set('dose', v), { min: 0, step: 'any' }),
-        el('span', { class: 'suffix' }, 'mg'))),
+        el('span', { class: 'suffix' }, 'mg')), pr.id),
       field('Frequency', select(FREQUENCIES.map((f) => ({ value: f.id, label: f.label })), pr.frequency,
-        (v) => set('frequency', v))),
+        (v) => set('frequency', v)), pr.id),
       field('Syringe', select(SYRINGES.map((s) => ({ value: s.id, label: s.label })), pr.syringeId,
-        (v) => set('syringeId', v)))),
+        (v) => set('syringeId', v)), pr.id)),
 
     el('div', { class: 'stats' },
       stat('Draw', `${fmtNum(calc.roundedUnits, 2)} units`,

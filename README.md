@@ -76,6 +76,9 @@ water going in: 3 mL is 300 units on the same syringe.
   retatrutide bottle at full dilution bottoms out near 0.5 mg, which is why
   that is the starting dose rather than anything lower.
 - **Caps bac water at 5 mL**, which is all a bottle will take.
+- **Shows the money on the screen you actually use.** Cost per dose sits under
+  the draw itself, broken into the share of the bottle, the water and the
+  syringe, so the figure is checkable rather than something to take on trust.
 - **Enforces a first-dose ceiling** on the compounds where that matters, and
   stands down once you have logged a dose or saved a protocol, so it does not
   cry wolf at someone already mid-ladder.
@@ -89,7 +92,7 @@ No build step. It is plain ES modules.
 
 ```sh
 npm run serve      # http://localhost:8080
-npm test           # 54 tests, no dependencies
+npm test           # 57 tests, no dependencies
 ```
 
 ## Deploying to Netlify
