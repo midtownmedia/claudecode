@@ -1,0 +1,12 @@
+{
+  "appId": "com.midtownmedia.peptidedosing",
+  "appName": "Peptide dosing",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

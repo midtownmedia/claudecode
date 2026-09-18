@@ -8,7 +8,11 @@
     "test": "node --test test/*.test.js",
     "dev": "node --test --watch test/*.test.js",
     "serve": "node --run serve:py || python3 -m http.server 8080 --directory public",
-    "serve:py": "python3 -m http.server 8080 --directory public"
+    "serve:py": "python3 -m http.server 8080 --directory public",
+    "android:init": "npm i -D @capacitor/cli @capacitor/core @capacitor/android && npx cap add android",
+    "android:sync": "npx cap sync android",
+    "android:apk": "npx cap sync android && cd android && ./gradlew assembleDebug",
+    "android:open": "npx cap open android"
   },
   "engines": {
     "node": ">=20"

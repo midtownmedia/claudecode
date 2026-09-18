@@ -5,3 +5,7 @@ node_modules/
 
 # local screenshot scratch
 shots/
+
+# capacitor / android build output
+android/
+.gradle/

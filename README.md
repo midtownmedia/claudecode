@@ -92,8 +92,45 @@ No build step. It is plain ES modules.
 
 ```sh
 npm run serve      # http://localhost:8080
-npm test           # 57 tests, no dependencies
+npm test           # 61 tests, no dependencies
 ```
+
+## Putting it on a phone
+
+The app installs to a home screen as-is. That is the route worth taking: it
+works on both Android and iPhone, it updates itself the next time it is opened,
+and there is no sideloading to talk anyone through.
+
+1. Deploy it (below) and open the URL on the phone.
+2. **Android / Chrome:** the browser offers "Install app", or use the menu →
+   Add to Home screen.
+3. **iPhone / Safari:** Share → Add to Home Screen. iOS has no install prompt,
+   so this step has to be done by hand.
+
+It then opens full screen with its own icon, and **works with no signal** — the
+whole app is precached by a service worker, which matters because this gets
+used at a fridge or in a bathroom where reception is often bad. `npm test`
+fails if the cache list drifts out of step with the files that actually ship.
+
+### Building an APK
+
+Only worth it if you specifically need a sideloadable file. An APK has to be
+rebuilt and redistributed to everyone for every change, only covers Android,
+and needs "install from unknown sources" turned on.
+
+The Capacitor scaffold is configured and ready; it bundles the web files into
+the app, so it does not depend on the site being hosted anywhere. It needs a
+JDK (17+) and the Android SDK, which is why it cannot be built in a sandbox
+without access to Google's download hosts.
+
+```sh
+npm run android:init    # installs Capacitor and creates android/
+npm run android:apk     # -> android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+`npm run android:open` opens the project in Android Studio if you would rather
+build a signed release there. After changing anything under `public/`, run
+`npm run android:sync` to copy it across.
 
 ## Deploying to Netlify
 

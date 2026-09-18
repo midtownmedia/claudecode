@@ -122,3 +122,9 @@ window.addEventListener('hashchange', () => {
 });
 
 render();
+
+// Offline support, registered after the first paint. The app works without it;
+// it just will not survive losing signal, which is exactly when it gets used.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
