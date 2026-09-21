@@ -170,6 +170,12 @@ default strength has to be a listed bottle size, the default diluent has to fit
 the vial, and no ladder step may trip its own redline. Run `npm test` after
 editing.
 
+## Building another version
+
+`HANDOFF.md` is written for someone implementing this independently: the domain
+facts, the constraints that came from the people using it, the bugs that are
+easy to hit, and what was deliberately left out.
+
 ## Scope
 
 This works out how far to pull a syringe plunger and what that costs. It cannot
