@@ -35,7 +35,7 @@ export function orderView(ctx) {
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
-      el('h2', {}, 'Order calculator'),
+      el('h2', {}, 'Plan an order'),
       el('p', { class: 'lede' },
         'Set how many bottles of each and this prices the whole order, then tells you how many days it actually covers at the dose you plan to take.'),
       el('div', { class: 'row' },

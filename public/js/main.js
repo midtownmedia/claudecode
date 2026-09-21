@@ -9,24 +9,41 @@ import { logView } from './views/log.js';
 import { costView } from './views/cost.js';
 import { orderView } from './views/order.js';
 import { referenceView } from './views/reference.js';
+import { todayView } from './views/today.js';
+import { moreView } from './views/more.js';
 import { peptide } from './data/peptides.js';
 
-const TABS = [
-  { id: 'calc', label: 'Draw', view: calculatorView },
-  { id: 'swap', label: 'Bottle changed', view: swapView },
-  { id: 'protocols', label: 'Protocols', view: protocolsView },
-  { id: 'log', label: 'Log', view: logView },
-  { id: 'cost', label: 'Cost', view: costView },
-  { id: 'order', label: 'Order', view: orderView },
-  { id: 'reference', label: 'Reference', view: referenceView },
+/**
+ * Four tabs, not seven.
+ *
+ * Only the screens someone touches routinely get a permanent place. Setup and
+ * reference are reached through More -- still one tap, but not competing for
+ * attention with the thing you open the app to do.
+ */
+const VIEWS = [
+  { id: 'today', label: 'Today', view: todayView, primary: true },
+  { id: 'calc', label: 'Calculator', view: calculatorView, primary: true },
+  { id: 'swap', label: 'Bottle changed', view: swapView, primary: true },
+  { id: 'more', label: 'More', view: moreView, primary: true },
+  { id: 'protocols', label: 'What I am taking', view: protocolsView },
+  { id: 'log', label: 'History', view: logView },
+  { id: 'cost', label: 'What it costs', view: costView },
+  { id: 'order', label: 'Plan an order', view: orderView },
+  { id: 'reference', label: 'Safety and reference', view: referenceView },
 ];
+const TABS = VIEWS.filter((v) => v.primary);
 
 const ctx = {
   state: load(),
   ui: {},
-  tab: location.hash.slice(1) || 'calc',
+  tab: location.hash.slice(1) || 'today',
   save() { save(this.state); },
   render() { render(); },
+  go(id) {
+    this.tab = id;
+    location.hash = id;
+    render();
+  },
   logDose(pr, calc) {
     const p = peptide(pr.peptideId);
     this.state.logs.push({
@@ -36,9 +53,7 @@ const ctx = {
       site: suggestSite(this.state.logs),
     });
     this.save();
-    this.tab = 'log';
-    location.hash = 'log';
-    this.render();
+    this.go('today');
   },
   exportData() {
     const blob = new Blob([exportJson(this.state)], { type: 'application/json' });
@@ -94,7 +109,8 @@ function render() {
     return;
   }
 
-  const tab = TABS.find((t) => t.id === ctx.tab) ?? TABS[0];
+  const tab = VIEWS.find((t) => t.id === ctx.tab) ?? VIEWS[0];
+  const onSecondary = !tab.primary;
 
   root.append(
     el('header', { class: 'topbar' },
@@ -103,21 +119,30 @@ function render() {
         el('span', {}, 'Peptide dosing')),
       el('nav', { class: 'tabs' },
         TABS.map((t) => el('a', {
-          href: `#${t.id}`, class: `tab${t.id === tab.id ? ' tab-on' : ''}`,
+          href: `#${t.id}`,
+          class: `tab${t.id === tab.id || (onSecondary && t.id === 'more') ? ' tab-on' : ''}`,
           onclick: () => { ctx.tab = t.id; },
         }, t.label)))),
-    el('main', { class: 'main' }, tab.view(ctx)),
+    el('main', { class: 'main' },
+      // A screen reached through More is not in the tab bar, so it needs its
+      // own way back or people get stranded on it.
+      onSecondary
+        ? el('div', { class: 'crumb' },
+          el('button', { type: 'button', class: 'linkbtn', onclick: () => ctx.go('more') }, '‹ More'),
+          el('span', { class: 'crumb-title' }, tab.label))
+        : null,
+      tab.view(ctx)),
     el('footer', { class: 'foot' },
       el('p', {},
         'Not medical advice. Nothing here leaves your browser. ',
-        el('a', { href: '#reference', onclick: () => { ctx.tab = 'reference'; } }, 'Red flags and handling')),
+        el('a', { href: '#reference', onclick: () => { ctx.tab = 'reference'; } }, 'Warning signs and handling')),
     ));
 
   restoreFocus(focus);
 }
 
 window.addEventListener('hashchange', () => {
-  ctx.tab = location.hash.slice(1) || 'calc';
+  ctx.tab = location.hash.slice(1) || 'today';
   render();
 });
 

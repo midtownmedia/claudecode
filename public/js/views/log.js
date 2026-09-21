@@ -17,7 +17,7 @@ export function logView(ctx) {
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
-      el('h2', {}, 'Dose log'),
+      el('h2', {}, 'History'),
       el('div', { class: 'stats' },
         stat('Doses in last 28 days', recent.length),
         stat('Against plan', Number.isFinite(adherence) ? `${fmtNum(adherence, 0)}%` : '--',

@@ -329,3 +329,56 @@ details.card > summary { cursor: pointer; font-weight: 600; }
 .costline-zero { color: var(--muted); }
 .costline-total td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: none; }
 .spend-detail .grid { margin-top: .5rem; }
+
+/* ---- Today: the answer, not a form ---- */
+.dosecard { display: grid; gap: .5rem; }
+.dosecard + .dosecard { margin-top: 0; }
+.dosecard-due { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+
+.dose-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.dose-name { font-weight: 700; font-size: 1.05rem; }
+.dose-when { font-size: .85rem; color: var(--muted); }
+.dose-when-due { color: var(--accent); font-weight: 650; }
+
+.dose-answer { text-align: center; margin: .25rem 0 .5rem; }
+.dose-units {
+  font-size: clamp(2.1rem, 11vw, 3rem); font-weight: 780; letter-spacing: -0.03em;
+  line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+.dose-sub { color: var(--muted); font-size: .92rem; margin-top: .15rem; }
+
+.dose-split {
+  background: var(--surface-2); border-radius: 10px; padding: .6rem .7rem;
+  font-size: .88rem; color: var(--text);
+}
+.dose-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  font-size: .82rem; color: var(--muted); padding-top: .15rem;
+}
+.dose-foot:only-child { justify-content: flex-end; }
+
+.empty { text-align: center; display: grid; gap: .6rem; }
+.empty .lede { margin-bottom: .5rem; }
+
+/* ---- More: a plain list, not a toolbar ---- */
+.menu { display: grid; gap: .5rem; }
+.menu-item {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: .15rem .75rem; text-align: left; width: 100%;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: .85rem .9rem; cursor: pointer; color: var(--text); font: inherit;
+}
+.menu-item:hover { border-color: var(--accent); }
+.menu-label { font-weight: 650; }
+.menu-hint { grid-column: 1; font-size: .82rem; color: var(--muted); }
+.menu-chev { grid-row: 1 / span 2; grid-column: 2; font-size: 1.4rem; color: var(--muted); }
+
+.crumb { display: flex; align-items: center; gap: .6rem; margin-bottom: .25rem; }
+.crumb-title { font-size: .85rem; color: var(--muted); }
+
+/* ---- calmer result ---- */
+.stats-pair { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 560px) { .stats-pair { grid-template-columns: repeat(2, 1fr); max-width: 28rem; margin-inline: auto; } }
+.subtle-details { margin-top: .25rem; }
+.subtle-details > summary { cursor: pointer; font-size: .85rem; color: var(--muted); font-weight: 600; }
+.subtle-details .grid { margin-top: .5rem; }

@@ -22,7 +22,7 @@ export function referenceView(ctx) {
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
-      el('h2', {}, 'Reference'),
+      el('h2', {}, 'Safety and reference'),
       el('p', { class: 'lede' },
         'Ranges below describe what these compounds are commonly given at, drawn from trial protocols where they exist and circulated sheets where they do not. They describe what is done, not what you should do.'),
       el('input', {

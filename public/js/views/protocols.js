@@ -29,7 +29,7 @@ export function protocolsView(ctx) {
   const list = ctx.state.protocols;
   return el('section', { class: 'view' },
     el('div', { class: 'card row-between' },
-      el('h2', {}, 'Protocols'),
+      el('h2', {}, 'What I am taking'),
       el('button', {
         type: 'button', class: 'btn btn-primary',
         onclick: () => { ctx.state.protocols.push(blank()); ctx.save(); ctx.render(); },

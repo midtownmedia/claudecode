@@ -9,7 +9,7 @@
  * two drift apart, because a stale list ships a half-broken offline app.
  */
 
-const VERSION = 'pdt-v1';
+const VERSION = 'pdt-v2';
 
 const ASSETS = [
   './css/app.css',
@@ -33,10 +33,12 @@ const ASSETS = [
   './js/views/calculator.js',
   './js/views/cost.js',
   './js/views/log.js',
+  './js/views/more.js',
   './js/views/order.js',
   './js/views/protocols.js',
   './js/views/reference.js',
   './js/views/swap.js',
+  './js/views/today.js',
   './manifest.webmanifest',
 ];
 

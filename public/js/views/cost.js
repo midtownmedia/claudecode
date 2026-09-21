@@ -38,7 +38,7 @@ export function costView(ctx) {
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
       el('div', { class: 'row-between' },
-        el('h2', {}, 'What this costs'),
+        el('h2', {}, 'What it costs'),
         field('Currency', select(CURRENCIES.map((c) => ({ value: c, label: c })), cur,
           (v) => { ctx.state.settings.currency = v; ctx.save(); ctx.render(); }))),
       el('div', { class: 'stats stats-big' },

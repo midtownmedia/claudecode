@@ -69,6 +69,9 @@ export function calculatorView(ctx) {
   const smaller = bestSyringeFor(calc.roundedUnits);
 
   const sheet = sheetFor(p.id);
+  const knownStrengths = [...new Set(p.strengthOptions ?? [])].sort((a, b) => a - b);
+  const showCustomStrength = st.customStrength
+    || !knownStrengths.some((v) => Math.abs(v - st.strength) < 1e-9);
 
   // Bottles that changed strength are the whole reason this app exists, so the
   // warning belongs on the screen people actually use, not only on Reference.
@@ -159,9 +162,13 @@ export function calculatorView(ctx) {
         : null),
 
       p.highRisk
-        ? banner('warn', `${p.name} is the one here with real potential to hurt someone. ` +
-          (p.firstDose ? p.firstDose.note + ' ' : '') +
-          'Every step of the ladder exists to let your gut adapt - skipping one is where people get badly ill.')
+        ? banner('warn', el('span', {},
+          el('strong', {}, `${p.name} is the one to take seriously. `),
+          p.firstDose ? `${p.firstDose.note} ` : '',
+          el('button', {
+            type: 'button', class: 'linkbtn',
+            onclick: () => ctx.go('reference'),
+          }, 'Why')))
         : null,
       el('div', { class: 'grid' },
         field('Compound', select(
@@ -177,16 +184,30 @@ export function calculatorView(ctx) {
           })),
         field('Your bottle says',
           el('div', { class: 'row' },
+            // One control, not two. The number box only appears for a size that
+            // is not on the list -- two inputs for one value reads as a puzzle.
             select(
-              [...new Set([...(p.strengthOptions ?? []), st.strength])].sort((a, b) => a - b)
-                .map((v) => ({ value: v, label: `${v} ${p.strengthUnit}` })),
-              st.strength, (v) => {
-                st.strength = Number(v);
-                st.vialPrice = seededPrice(p, st.strength);
+              [
+                ...knownStrengths.map((v) => ({ value: String(v), label: `${v} ${p.strengthUnit}` })),
+                { value: 'other', label: 'Something else' },
+              ],
+              showCustomStrength ? 'other' : String(st.strength),
+              (v) => {
+                if (v === 'other') {
+                  st.customStrength = true;
+                } else {
+                  st.customStrength = false;
+                  st.strength = Number(v);
+                  st.vialPrice = seededPrice(p, st.strength);
+                }
                 ctx.render();
               }),
-            number(st.strength, (v) => { st.strength = v; st.vialPrice = seededPrice(p, v); ctx.render(); },
-              { class: 'narrow', min: 0, step: 'any', 'aria-label': 'Custom bottle strength' })),
+            showCustomStrength
+              ? el('div', { class: 'row' },
+                number(st.strength, (v) => { st.strength = v; st.vialPrice = seededPrice(p, v); ctx.render(); },
+                  { class: 'narrow', min: 0, step: 'any', 'aria-label': 'Bottle strength' }),
+                el('span', { class: 'suffix' }, p.strengthUnit))
+              : null),
           'Read this off the label, not off the protocol sheet.'),
         field('Bac water added',
           el('div', { class: 'row' },
@@ -194,24 +215,27 @@ export function calculatorView(ctx) {
             el('span', { class: 'suffix' }, 'mL'),
             el('span', { class: 'equals' },
               `= ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units`)),
-          `1 mL = 100 units on a U-100 syringe, so ${fmtNum(st.diluentMl ?? 0, 2)} mL is ${fmtNum(mlToUnits(st.diluentMl ?? 0, 100), 0)} units if you measure it with one. A bottle takes ${MAX_BAC_WATER_ML} mL at most.`),
-        field('Bottle price',
-          el('div', { class: 'row' },
-            el('span', { class: 'suffix' }, ctx.state.settings.currency ?? 'USD'),
-            number(st.vialPrice, (v) => { st.vialPrice = v; ctx.render(); }, { min: 0, step: 'any' })),
-          'What one bottle costs, so the maths below can tell you what a dose is worth.'),
-        field('Syringe', select(
-          SYRINGES.map((x) => ({ value: x.id, label: x.label })), st.syringeId,
-          (v) => { st.syringeId = v; ctx.state.settings.syringeId = v; ctx.save(); ctx.render(); })),
+          `${MAX_BAC_WATER_ML} mL is the most a bottle takes.`),
         field('Dose',
           el('div', { class: 'row' },
             number(st.dose, (v) => { st.dose = v; ctx.render(); }, { min: 0, step: 'any' }),
             el('span', { class: 'suffix' }, 'mg')),
-          'The real instruction. Units change with the bottle, this does not.')),
+          'Units change with the bottle. This does not.')),
+
+      detailsBox(ctx, 'calc-options', 'Syringe and price', { class: 'subtle-details' },
+        el('div', { class: 'grid' },
+          field('Syringe', select(
+            SYRINGES.map((x) => ({ value: x.id, label: x.label })), st.syringeId,
+            (v) => { st.syringeId = v; ctx.state.settings.syringeId = v; ctx.save(); ctx.render(); })),
+          field('Bottle price',
+            el('div', { class: 'row' },
+              el('span', { class: 'suffix' }, ctx.state.settings.currency ?? 'USD'),
+              number(st.vialPrice, (v) => { st.vialPrice = v; ctx.render(); }, { min: 0, step: 'any' })),
+            'Fills in the cost below.'))),
 
       (p.ladder?.length
         ? el('div', { class: 'chips' },
-          el('span', { class: 'chips-label' }, 'Ladder:'),
+          el('span', { class: 'chips-label' }, 'Your schedule:'),
           p.ladder.map((step) => el('button', {
             type: 'button',
             class: `chip${Math.abs(step.dose - st.dose) < 1e-9 ? ' chip-on' : ''}`,
@@ -228,15 +252,9 @@ export function calculatorView(ctx) {
         el('div', { class: 'headline-main' }, `Draw ${fmtNum(calc.roundedUnits, 2)} units`),
         el('div', { class: 'headline-sub' },
           `for ${formatMass(calc.requestedDose)} of ${p.name}`)),
-      el('div', { class: 'stats' },
+      el('div', { class: 'stats stats-pair' },
         stat('One unit is', formatMass(calc.perUnit), 'on this bottle'),
-        stat('Volume', `${fmtNum(calc.volumeMl, 3)} mL`),
-        stat('Actually delivered', formatMass(calc.actualDose),
-          Number.isFinite(calc.errorPct) && Math.abs(calc.errorPct) >= 0.05
-            ? `${calc.errorPct > 0 ? '+' : ''}${fmtNum(calc.errorPct, 1)}% vs target` : 'exact'),
-        stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--'),
-        stat('Smallest this bottle can do', formatMass(floorDose),
-          atMaxWater ? 'at full dilution' : `at ${fmtNum(st.diluentMl, 2)} mL`)),
+        stat('Doses in bottle', Number.isFinite(calc.dosesPerVial) ? calc.dosesPerVial : '--')),
       (spend
         ? el('div', { class: 'spendstrip' },
           el('div', { class: 'spend-main' }, `${moneyExact(spend.perDose)} a dose`),
@@ -310,6 +328,13 @@ export function calculatorView(ctx) {
       : null),
 
     detailsBox(ctx, 'calc-maths', 'Show me the maths', { class: 'card' },
+      el('div', { class: 'stats' },
+        stat('Volume', `${fmtNum(calc.volumeMl, 3)} mL`),
+        stat('Actually delivered', formatMass(calc.actualDose),
+          Number.isFinite(calc.errorPct) && Math.abs(calc.errorPct) >= 0.05
+            ? `${calc.errorPct > 0 ? '+' : ''}${fmtNum(calc.errorPct, 1)}% vs target` : 'exact'),
+        stat('Smallest this bottle can do', formatMass(floorDose),
+          atMaxWater ? 'at full dilution' : `at ${fmtNum(st.diluentMl, 2)} mL`)),
       el('ol', { class: 'maths' },
         el('li', {}, `The bottle holds ${st.strength} ${p.strengthUnit} of powder.`),
         el('li', {}, `You added ${fmtNum(st.diluentMl, 3)} mL of water, so the liquid is ${fmtNum(calc.concentration, 4)} mg per mL.`),
