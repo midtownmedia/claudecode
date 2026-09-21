@@ -10,10 +10,14 @@ export function logView(ctx) {
   const logs = [...ctx.state.logs].sort((a, b) => new Date(b.at) - new Date(a.at));
   const next = suggestSite(logs);
   const since = Date.now() - 28 * DAY_MS;
+  // Numerator and denominator must describe the same protocols, or the ratio is
+  // meaningless -- orphaned logs from a deleted protocol were inflating it.
+  const scheduled = ctx.state.protocols.filter((p) => p.active && dosesPerWeek(p.frequency) > 0);
+  const scheduledIds = new Set(scheduled.map((p) => p.id));
   const recent = logs.filter((l) => new Date(l.at).getTime() >= since);
-  const expected = ctx.state.protocols.filter((p) => p.active)
-    .reduce((s, p) => s + dosesPerWeek(p.frequency) * 4, 0);
-  const adherence = expected > 0 ? (recent.length / expected) * 100 : NaN;
+  const counted = recent.filter((l) => scheduledIds.has(l.protocolId));
+  const expected = scheduled.reduce((s, p) => s + dosesPerWeek(p.frequency) * 4, 0);
+  const adherence = expected > 0 ? (counted.length / expected) * 100 : NaN;
 
   return el('section', { class: 'view' },
     el('div', { class: 'card' },
@@ -21,7 +25,7 @@ export function logView(ctx) {
       el('div', { class: 'stats' },
         stat('Doses in last 28 days', recent.length),
         stat('Against plan', Number.isFinite(adherence) ? `${fmtNum(adherence, 0)}%` : '--',
-          expected > 0 ? `${fmtNum(expected, 0)} expected` : 'no active protocols'),
+          expected > 0 ? `${counted.length} of ${fmtNum(expected, 0)} expected` : 'nothing scheduled'),
         stat('Next site', next, 'least recently used'),
         stat('Total logged', logs.length))),
 
@@ -46,6 +50,7 @@ export function logView(ctx) {
                 type: 'button', class: 'btn btn-danger-ghost slim',
                 onclick: () => {
                   ctx.state.logs = ctx.state.logs.filter((x) => x.id !== l.id);
+                  ctx.markDeleted('logs', l.id);
                   ctx.save(); ctx.render();
                 },
               }, 'Remove')));

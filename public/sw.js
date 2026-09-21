@@ -9,7 +9,7 @@
  * two drift apart, because a stale list ships a half-broken offline app.
  */
 
-const VERSION = 'pdt-v2';
+const VERSION = 'pdt-v3';
 
 const ASSETS = [
   './css/app.css',

@@ -2,14 +2,26 @@
  * Persistence.
  *
  * Everything lives in this browser's localStorage. Nothing is uploaded, there
- * is no account and no server to leak. The cost is that clearing site data
- * wipes it, so export is a first-class feature rather than an afterthought.
+ * is no account and no server to leak. The cost is that this is the only copy,
+ * so losing a write is losing medical history -- and a dose that silently fails
+ * to save is worse than an error, because the app then tells the user they
+ * never took it.
+ *
+ * Two rules follow:
+ *   1. save() reports whether it actually wrote. Callers must check.
+ *   2. save() merges rather than overwrites. The app can be open twice (a tab
+ *      and a home-screen copy), and each holds its own snapshot loaded at
+ *      startup. Writing that snapshot wholesale destroys anything the other
+ *      copy recorded in the meantime.
  */
 
 const KEY = 'pdt.state.v1';
+const CORRUPT_PREFIX = 'pdt.state.v1.corrupt.';
+export const PREIMPORT_KEY = 'pdt.state.v1.preimport';
 
 export const DEFAULT_STATE = {
   version: 1,
+  rev: 0,
   settings: {
     currency: 'USD',
     acknowledgedAt: null,
@@ -19,7 +31,32 @@ export const DEFAULT_STATE = {
   protocols: [],
   logs: [],
   purchases: [],
+  // Deletions have to travel with the data. Without them a merge would treat a
+  // record deleted here as one created by the other copy and resurrect it.
+  deleted: { protocols: [], logs: [], purchases: [] },
 };
+
+/** Accessing localStorage itself can throw, so never touch it unguarded. */
+export function storage() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function storageAvailable() {
+  const ls = storage();
+  if (!ls) return false;
+  try {
+    const probe = '__pdt_probe__';
+    ls.setItem(probe, '1');
+    ls.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function safeParse(raw) {
   try {
@@ -30,19 +67,34 @@ function safeParse(raw) {
 }
 
 export function load() {
-  if (typeof localStorage === 'undefined') return structuredClone(DEFAULT_STATE);
+  const ls = storage();
+  if (!ls) return structuredClone(DEFAULT_STATE);
+
   let raw = null;
   try {
-    raw = localStorage.getItem(KEY);
+    raw = ls.getItem(KEY);
   } catch {
     return structuredClone(DEFAULT_STATE);
   }
-  const parsed = raw ? safeParse(raw) : null;
+  if (!raw) return structuredClone(DEFAULT_STATE);
+
+  const parsed = safeParse(raw);
+  if (!parsed) {
+    // Unreadable is not the same as absent. Set it aside before anything
+    // overwrites it -- it may still be repairable by hand.
+    try {
+      ls.setItem(`${CORRUPT_PREFIX}${raw.length}`, raw);
+    } catch { /* nothing more we can do */ }
+    const fresh = structuredClone(DEFAULT_STATE);
+    fresh.loadFailed = true;
+    return fresh;
+  }
   return migrate(parsed);
 }
 
 export function migrate(parsed) {
   if (!parsed || typeof parsed !== 'object') return structuredClone(DEFAULT_STATE);
+  const d = parsed.deleted ?? {};
   return {
     ...structuredClone(DEFAULT_STATE),
     ...parsed,
@@ -50,17 +102,88 @@ export function migrate(parsed) {
     protocols: Array.isArray(parsed.protocols) ? parsed.protocols : [],
     logs: Array.isArray(parsed.logs) ? parsed.logs : [],
     purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
+    deleted: {
+      protocols: Array.isArray(d.protocols) ? d.protocols : [],
+      logs: Array.isArray(d.logs) ? d.logs : [],
+      purchases: Array.isArray(d.purchases) ? d.purchases : [],
+    },
   };
 }
 
+function unionById(mine = [], theirs = [], tombstones = []) {
+  const gone = new Set(tombstones);
+  const out = new Map();
+  // Theirs first so my own edits to the same record win on top.
+  for (const r of theirs) if (r?.id && !gone.has(r.id)) out.set(r.id, r);
+  for (const r of mine) if (r?.id && !gone.has(r.id)) out.set(r.id, r);
+  return [...out.values()];
+}
+
+function unionIds(a = [], b = []) {
+  return [...new Set([...a, ...b])];
+}
+
+/**
+ * Fold this copy's state into whatever is on disk, rather than replacing it.
+ * Records are unioned by id; deletions are honoured from either side.
+ */
+export function mergeWithStored(state, stored) {
+  if (!stored) return state;
+  const deleted = {
+    protocols: unionIds(state.deleted?.protocols, stored.deleted?.protocols),
+    logs: unionIds(state.deleted?.logs, stored.deleted?.logs),
+    purchases: unionIds(state.deleted?.purchases, stored.deleted?.purchases),
+  };
+  return {
+    ...stored,
+    ...state,
+    settings: { ...(stored.settings ?? {}), ...(state.settings ?? {}) },
+    protocols: unionById(state.protocols, stored.protocols, deleted.protocols),
+    logs: unionById(state.logs, stored.logs, deleted.logs),
+    purchases: unionById(state.purchases, stored.purchases, deleted.purchases),
+    deleted,
+    rev: Math.max(state.rev ?? 0, stored.rev ?? 0),
+  };
+}
+
+/**
+ * @returns {boolean} true only if the write actually landed. Callers must not
+ * report success to the user without checking this.
+ */
 export function save(state) {
-  if (typeof localStorage === 'undefined') return false;
+  const ls = storage();
+  if (!ls) return false;
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    const stored = migrateOrNull(ls.getItem(KEY));
+    const merged = mergeWithStored(state, stored);
+    merged.rev = (merged.rev ?? 0) + 1;
+    ls.setItem(KEY, JSON.stringify(merged));
+
+    // Bring this copy up to date with anything the merge pulled in, so the
+    // screen reflects what is actually stored and the next save builds on it.
+    state.rev = merged.rev;
+    state.protocols = merged.protocols;
+    state.logs = merged.logs;
+    state.purchases = merged.purchases;
+    state.deleted = merged.deleted;
     return true;
   } catch {
     return false;
   }
+}
+
+function migrateOrNull(raw) {
+  if (!raw) return null;
+  const parsed = safeParse(raw);
+  return parsed ? migrate(parsed) : null;
+}
+
+/** Record a deletion so a merge cannot resurrect it. */
+export function markDeleted(state, kind, id) {
+  state.deleted ??= { protocols: [], logs: [], purchases: [] };
+  state.deleted[kind] ??= [];
+  if (!state.deleted[kind].includes(id)) state.deleted[kind].push(id);
+  return state;
 }
 
 export function uid() {
@@ -76,6 +199,15 @@ export function importJson(text) {
   if (!parsed) throw new Error('That file is not valid JSON.');
   if (!('protocols' in parsed) && !('logs' in parsed)) {
     throw new Error('That JSON does not look like a backup from this app.');
+  }
+  // A file carrying only one of the two used to pass, and migrate() would then
+  // quietly replace the missing half with an empty array -- importing a partial
+  // file wiped either every protocol or the entire dose history, with no error.
+  if (!Array.isArray(parsed.protocols) || !Array.isArray(parsed.logs)) {
+    throw new Error(
+      'That backup is incomplete: it is missing its protocols or its dose history. ' +
+      'Importing it would erase what is on this device, so nothing has been changed.'
+    );
   }
   return migrate(parsed);
 }
@@ -108,4 +240,15 @@ export function suggestSite(logs = []) {
     }
   }
   return best;
+}
+
+/** A dose logged moments ago for the same protocol is almost certainly a double tap. */
+export const DUPLICATE_WINDOW_MS = 3 * 60 * 1000;
+
+export function recentDuplicate(logs, protocolId, at = Date.now()) {
+  return logs.find((l) => {
+    if (l.protocolId !== protocolId) return false;
+    const t = new Date(l.at).getTime();
+    return Number.isFinite(t) && at - t >= 0 && at - t < DUPLICATE_WINDOW_MS;
+  }) ?? null;
 }

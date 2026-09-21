@@ -66,6 +66,7 @@ function protocolCard(ctx, pr) {
           onclick: () => {
             if (!confirm(`Delete "${pr.nickname || p.name}"? Its dose history stays in the log.`)) return;
             ctx.state.protocols = ctx.state.protocols.filter((x) => x.id !== pr.id);
+            ctx.markDeleted('protocols', pr.id);
             ctx.save(); ctx.render();
           },
         }, 'Delete'))),

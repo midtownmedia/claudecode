@@ -1,7 +1,8 @@
 /** App shell: state, tabs, first-run acknowledgement, backup. */
 
 import { el, $, clear, banner, captureFocus, restoreFocus } from './ui/dom.js';
-import { load, save, uid, exportJson, importJson, DEFAULT_STATE, suggestSite } from './lib/store.js';
+import { load, save, uid, exportJson, importJson, DEFAULT_STATE, suggestSite,
+  markDeleted, recentDuplicate, storageAvailable, PREIMPORT_KEY, storage } from './lib/store.js';
 import { calculatorView } from './views/calculator.js';
 import { swapView } from './views/swap.js';
 import { protocolsView } from './views/protocols.js';
@@ -37,7 +38,10 @@ const ctx = {
   state: load(),
   ui: {},
   tab: location.hash.slice(1) || 'today',
-  save() { save(this.state); },
+  // Returns false when the write did not land. Anything that tells the user
+  // something was recorded has to check this.
+  save() { return save(this.state); },
+  markDeleted(kind, id) { markDeleted(this.state, kind, id); },
   render() { render(); },
   go(id) {
     this.tab = id;
@@ -46,13 +50,29 @@ const ctx = {
   },
   logDose(pr, calc) {
     const p = peptide(pr.peptideId);
-    this.state.logs.push({
+    const dupe = recentDuplicate(this.state.logs, pr.id);
+    if (dupe) {
+      const mins = Math.max(1, Math.round((Date.now() - new Date(dupe.at).getTime()) / 60000));
+      if (!confirm(`You logged this ${mins} minute${mins === 1 ? '' : 's'} ago. Log another dose?`)) return;
+    }
+
+    const entry = {
       id: uid(), protocolId: pr.id, peptideId: pr.peptideId,
       label: pr.nickname || p?.name, at: new Date().toISOString(),
       doseMg: calc.requestedDose, units: calc.roundedUnits,
       site: suggestSite(this.state.logs),
-    });
-    this.save();
+    };
+    this.state.logs.push(entry);
+
+    if (!this.save()) {
+      // Never leave the user believing a dose was recorded when it was not:
+      // the next launch would show it as still due and invite a second one.
+      this.state.logs = this.state.logs.filter((l) => l.id !== entry.id);
+      this.saveFailed = 'That dose was NOT saved. This browser is out of storage or is blocking it. Write the dose down before you forget it.';
+      this.render();
+      return;
+    }
+    this.saveFailed = null;
     this.go('today');
   },
   exportData() {
@@ -64,12 +84,34 @@ const ctx = {
   },
   async importData(file) {
     if (!file) return;
+    let incoming;
     try {
-      this.state = importJson(await file.text());
-      this.save(); this.render();
+      incoming = importJson(await file.text());
     } catch (err) {
       alert(err.message);
+      return;
     }
+
+    // Import replaces everything and cannot be undone, so say what is being
+    // traded for what before doing it.
+    const here = `${this.state.protocols.length} protocol${this.state.protocols.length === 1 ? '' : 's'} and ${this.state.logs.length} logged dose${this.state.logs.length === 1 ? '' : 's'}`;
+    const there = `${incoming.protocols.length} protocol${incoming.protocols.length === 1 ? '' : 's'} and ${incoming.logs.length} logged dose${incoming.logs.length === 1 ? '' : 's'}`;
+    if (!confirm(`Replace ${here} on this device with ${there} from the file?\n\nThis cannot be undone.`)) return;
+
+    const previous = this.state;
+    try {
+      storage()?.setItem(PREIMPORT_KEY, exportJson(previous));
+    } catch { /* best effort */ }
+
+    this.state = incoming;
+    if (!this.save()) {
+      this.state = previous;
+      this.saveFailed = 'The backup could not be written to this browser, so nothing was changed.';
+      this.render();
+      return;
+    }
+    this.saveFailed = null;
+    this.render();
   },
   reset() {
     this.state = structuredClone(DEFAULT_STATE);
@@ -124,6 +166,18 @@ function render() {
           onclick: () => { ctx.tab = t.id; },
         }, t.label)))),
     el('main', { class: 'main' },
+      ctx.saveFailed ? banner('danger', ctx.saveFailed) : null,
+      ctx.state.loadFailed
+        ? banner('danger',
+          'Your saved data could not be read and could not be recovered automatically. '
+          + 'A copy of the unreadable file has been kept in this browser in case it can be repaired. '
+          + 'Nothing has been overwritten yet.')
+        : null,
+      ctx.storageBlocked
+        ? banner('warn',
+          'This browser is not letting the app save anything, so doses will not be remembered. '
+          + 'Private browsing usually causes this.')
+        : null,
       // A screen reached through More is not in the tab bar, so it needs its
       // own way back or people get stranded on it.
       onSecondary
@@ -141,11 +195,31 @@ function render() {
   restoreFocus(focus);
 }
 
+// The app can be open twice -- a browser tab and a home-screen copy. Each holds
+// its own snapshot, so re-read whenever the other one writes or when this copy
+// comes back to the foreground. Without this, a stale copy shows a dose that was
+// already taken as still due.
+function refreshFromStorage() {
+  const before = JSON.stringify([ctx.state.logs.length, ctx.state.protocols.length, ctx.state.rev]);
+  ctx.state = load();
+  if (JSON.stringify([ctx.state.logs.length, ctx.state.protocols.length, ctx.state.rev]) !== before) render();
+}
+
+window.addEventListener('storage', (e) => {
+  if (e.key === null || e.key === 'pdt.state.v1') refreshFromStorage();
+});
+// The storage event does not fire in the tab that wrote, and does not fire at
+// all between a standalone PWA and a browser tab on some platforms.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshFromStorage();
+});
+
 window.addEventListener('hashchange', () => {
   ctx.tab = location.hash.slice(1) || 'today';
   render();
 });
 
+ctx.storageBlocked = !storageAvailable();
 render();
 
 // Offline support, registered after the first paint. The app works without it;

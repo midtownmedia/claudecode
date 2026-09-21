@@ -131,6 +131,7 @@ export function costView(ctx) {
                 type: 'button', class: 'btn btn-danger-ghost slim',
                 onclick: () => {
                   ctx.state.purchases = ctx.state.purchases.filter((y) => y.id !== x.id);
+                  ctx.markDeleted('purchases', x.id);
                   ctx.save(); ctx.render();
                 },
               }, 'Remove'))))))
