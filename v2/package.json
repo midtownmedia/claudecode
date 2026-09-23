@@ -1,0 +1,15 @@
+{
+  "name": "peptides-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Peptides: syringe maths, a dose log and weight tracking with charts. Static, offline, and the data stays on the device.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "python3 -m http.server 8081 --directory public",
+    "icons": "node scripts/render-icons.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

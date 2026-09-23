@@ -1,5 +1,9 @@
 # Peptide dosing
 
+> **v2:** a simpler, iPhone-style rebuild with weight tracking, progress charts
+> and a data file you save and open lives in [`v2/`](v2/README.md). This page
+> describes the original app in `public/`.
+
 A reconstitution calculator, bottle-strength checker, dose log and running cost
 tracker for injectable peptide protocols. Static site, no backend, no accounts,
 nothing leaves the browser.
@@ -92,7 +96,7 @@ No build step. It is plain ES modules.
 
 ```sh
 npm run serve      # http://localhost:8080
-npm test           # 61 tests, no dependencies
+npm test           # 74 tests, no dependencies
 ```
 
 ## Putting it on a phone
