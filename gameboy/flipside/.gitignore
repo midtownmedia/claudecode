@@ -1,0 +1,10 @@
+# compiler intermediates (the ROM itself is committed)
+*.o
+*.lst
+*.asm
+*.sym
+*.map
+*.noi
+*.ihx
+*.gbc.ram
+*.sav
