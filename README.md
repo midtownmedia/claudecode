@@ -1,5 +1,9 @@
 # Peptide dosing
 
+> **VetScribe**, an ambient scribe for a veterinary practice (badge-mode
+> recording, SOAP drafting from the practice record, PIMS write-back), lives in
+> [`vetscribe/`](vetscribe/README.md). It is a separate project in this repo.
+
 > **v2:** a simpler, iPhone-style rebuild with weight tracking, progress charts
 > and a data file you save and open lives in [`v2/`](v2/README.md). This page
 > describes the original app in `public/`.
