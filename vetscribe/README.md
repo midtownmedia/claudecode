@@ -67,12 +67,62 @@ screen, set your name in Settings.
 | `ANTHROPIC_API_KEY` | Turns on the real scribe. |
 | `VETSCRIBE_MODEL` | `claude-sonnet-5-5` by default. It is accurate on doses and vitals and costs about 4 to 5 cents per complete visit. `claude-haiku-5-5` is roughly 20x cheaper; trial it on your own transcripts before switching. |
 | `VETSCRIBE_EFFORT` | `medium`. This is organisation work, not reasoning. |
-| `TRANSCRIBE_PROVIDER` | `browser` uses the live captions the phone captured (free; Chrome on Android and Safari on iOS both do this). `openai` posts the audio to any OpenAI-compatible `/v1/audio/transcriptions` endpoint: OpenAI, Groq, or a local whisper.cpp / faster-whisper server. If that call fails, the captions are used and the note says so. |
-| `PIMS_ADAPTER` | `mock` for the demo day; `bridge` for your practice system. |
+| `TRANSCRIBE_PROVIDER` | `openai` (the default once `TRANSCRIBE_API_KEY` is set) posts each recording to any OpenAI-compatible `/v1/audio/transcriptions` endpoint: OpenAI's hosted Whisper, Groq, or a whisper.cpp / faster-whisper server inside the practice. `browser` uses only the phone's live captions. If the Whisper call fails, the captions are used as a fallback and the note says so. |
+| `CAPTIONS` | Live captions on the badge screen. They use the phone's speech service (Google on Android, Apple on iOS), so they default to off once Whisper is configured. |
+| `KEEP_AUDIO`, `AUDIO_RETENTION_DAYS` | Delete each recording as soon as it is transcribed, or keep it for review and sweep it after N days. Transcripts and notes are kept either way. |
+| `PIMS_ADAPTER` | `mock` for the demo day; `daysmart` for DaySmart Vet (Vetter); `bridge` for anything else. |
 | `AUTH_TOKEN` | A shared device token. Each phone enters it once in Settings. |
 | `DATA_DIR` | Where visits, drafts and audio live. One JSON file per visit; back it up like any other record. |
 
-## Connecting the practice management system
+## Connecting DaySmart Vet (Vetter)
+
+`server/pims/daysmart.js` is built from DaySmart's public API reference
+(`sandbox.vettersoftware.com/docs`). What that reference establishes, and what
+the adapter therefore does:
+
+- **Auth:** OAuth2 client credentials. `POST /oauth/access_token` with
+  `grant_type=client_credentials`, `client_id`, `client_secret` and an
+  `x-api-key` header; the token lasts an hour and is cached. Every request
+  then carries `Authorization: Bearer`, `x-api-key` and the clinic ID in a
+  header. The reference does not show that header's name, so it is
+  `DAYSMART_CLINIC_HEADER` (default `x-clinic-id`).
+- **Paths:** `https://{domain}/api/1.0.0/{apiKey}/appointments`,
+  `/patients`, `/clients`, `/appointment-providers`, `/appointment-types`,
+  `/communications`. Lists take `page` and `perPage` (max 200) and come back
+  as `{ response: { message, meta, resources: [...] } }`.
+- **Reads:** the day's appointments (the reference documents no date filter,
+  so the day is selected from the list; `DAYSMART_SCHEDULE_QUERY` adds one if
+  the probe finds it), each enriched from `/patients/{id}` and
+  `/clients/{id}`. Patient resources carry name, species, breeds, sex,
+  birthdate, color and chip; weight is not on the patient.
+- **What is not documented:** where weights, vaccines and prior SOAPs live,
+  and any endpoint that writes a medical record. `DAYSMART_RECORDS_PATH`, once
+  the probe shows a records list, is mined by field name for weights,
+  vaccines, labs, prescriptions and notes. Write-back defaults to an
+  **outbox**: the finished note is saved under `DATA_DIR/outbox/` and the
+  phone shows *Paste into Vetter* with a Copy button. `DAYSMART_NOTE_MODE=communication`
+  additionally posts the note as a communication entry on the client record.
+
+First day with credentials:
+
+```bash
+node --env-file=.env scripts/daysmart-probe.mjs
+```
+
+It gets a token, pulls one page each of appointments, providers, types,
+patients and clients, tries the likely patient-record paths, saves every raw
+response under `DATA_DIR/probe/`, prints the field names it saw, and shows the
+first appointment as VetScribe would map it. Compare the keys with the
+`pick()` names in `server/pims/daysmart.js`; field names the reference did not
+show are guesses with the camelCase and snake_case variants covered.
+
+Things to ask DaySmart for when requesting developer access: the clinic ID
+header name, whether the appointments list takes a date range, the patient
+records or medical history endpoint, and whether a SOAP or medical record can
+be created through the API. The last one turns the outbox into a real
+write-back.
+
+## Connecting any other practice management system
 
 The app never talks to the PIMS directly. It talks to a **bridge**: four HTTP
 endpoints that you (or your PIMS vendor's integrator) implement once against
@@ -154,9 +204,11 @@ server/
   pims/
     normalize.js    the one record shape; adapters produce it
     mock.js         a seeded day
+    daysmart.js     DaySmart Vet (Vetter): OAuth2, reads, outbox write-back
     bridge.js       the HTTP contract above
-  transcribe/       browser captions, or an OpenAI-compatible endpoint
+  transcribe/       Whisper (any OpenAI-compatible endpoint), or browser captions
 public/             the phone app: schedule, visit, badge mode, settings
+scripts/            daysmart-probe.mjs (confirm the live API shapes), icon rendering
 test/               node --test; runs the real routes against the mock stack
 ```
 
@@ -165,12 +217,66 @@ the mock model and with a fake Claude client that checks the request shape),
 the visit lifecycle, the HTTP API including the device token, and the PWA
 shell.
 
+## Privacy: what leaves the building, and what does not
+
+Veterinary records are not HIPAA, but client names, phone numbers and
+addresses are personal data and the practice is responsible for them. The
+defaults are set so the minimum leaves the practice.
+
+**What Claude receives** per draft: the pre-visit briefing and the transcripts.
+The briefing carries the patient's record (signalment, weights, problems,
+medications, vaccines, labs, last visit, open recommendations), the owner's
+**first name only**, their preferred contact method, and the practice's client
+notes. It never carries phone numbers, email addresses or postal addresses;
+the note header is filled from the record on your server after the draft comes
+back. Transcripts contain whatever was said in the room. Anthropic does not
+train on API inputs; check the data retention setting on your Anthropic
+organisation (zero data retention can be requested).
+
+**What the transcription service receives:** the audio of each segment, plus a
+vocabulary hint made of the patient's name and current medications (not the
+client's name). With OpenAI or Groq that is their servers; with whisper.cpp or
+faster-whisper on a machine in the practice it never leaves the network, and
+the adapter is the same either way (`TRANSCRIBE_URL`).
+
+**What the phone's browser sends:** nothing, unless live captions are on.
+Captions use the browser's speech service (Google on Android Chrome, Apple on
+iOS Safari), so they are off by default once Whisper is configured.
+
+**What is stored on your server:** one JSON file per visit under `DATA_DIR`
+(the record snapshot with phone and email stripped, transcripts, drafts, the
+final note) and the audio. Audio is deleted after transcription with
+`KEEP_AUDIO=false`, or kept and swept after `AUDIO_RETENTION_DAYS`. Visit files
+are kept; they are your medical record of the draft and should be backed up
+with the rest of the practice data.
+
+**What the app reads from DaySmart:** appointments, patients and clients for
+the day being shown, and patient records if a path is configured. It writes
+nothing to the PIMS unless `DAYSMART_NOTE_MODE=communication`. The developer
+credentials DaySmart issues are clinic-wide; the app cannot narrow their scope,
+so treat `.env` as a secret and run the server on a machine the practice
+controls.
+
+**Limitations to know before connecting**
+
+- One shared device token, no per-user accounts, no audit trail beyond the
+  signer's self-reported name on each visit. Fine for a single practice on its
+  own network; not an access-control system.
+- Traffic between phone and server is plain HTTP unless you put TLS in front
+  of it (a reverse proxy with a certificate, or Tailscale). Do that before the
+  phones leave the building's Wi-Fi.
+- Audio is not diarised. A client's own words are attributed by context, not
+  by voice.
+- The phone captions, if enabled, are a third-party speech service.
+- The DaySmart write-back is an outbox until DaySmart confirms a medical
+  record endpoint. Nothing is written to the EMR automatically by default.
+
 ## What to know before relying on it
 
-- **Transcription quality decides note quality.** Browser captions are fine in
-  a quiet room on a recent phone; a Whisper-class provider is better with
-  drug names and overlapping speech. The server passes the patient's name and
-  current medications to the transcriber as a vocabulary hint.
+- **Transcription quality decides note quality.** Whisper is the default for
+  that reason. The server passes the patient's name and current medications
+  to the transcriber as a vocabulary hint; the phone's captions are only a
+  fallback if the Whisper call fails.
 - **Audio is not diarised.** The scribe infers who is speaking from content.
   Starting the technician and doctor recordings separately is what gives it a
   reliable signal.
@@ -181,6 +287,6 @@ shell.
   your server. Run the server inside the practice network or behind TLS, set
   `AUTH_TOKEN`, and back up the data directory. Claude's API does not train
   on your data; check your retention settings in the Anthropic console.
-- **The bridge is yours to build.** The mock shows the shape; no vendor API is
-  wired in here, because each one needs credentials and a tenant to test
-  against. Say which PIMS you run and the bridge is the next piece.
+- **The DaySmart mapping is unverified against a live tenant.** It follows
+  the public reference and tolerates the usual naming variants, and the probe
+  script exists to confirm it on day one. Expect to adjust a few field names.

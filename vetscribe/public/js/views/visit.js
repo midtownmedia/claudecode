@@ -182,7 +182,7 @@ export async function visitView(app, root, id) {
   const state = { actions: new Set(), actionsFor: null };
   let visit = null;
 
-  const record = (role) => openBadge({ visit, role, onFinished: () => load() });
+  const record = (role) => openBadge({ visit, role, captions: app.health?.captions !== false, onFinished: () => load() });
 
   const render = () => {
     clear(body);
@@ -197,10 +197,11 @@ export async function visitView(app, root, id) {
 
     body.append(h('div', {},
       h('div', { class: 'visit-head' },
-        h('h1', { class: 'visit-name' }, p.name, locked ? chip('Sent to PIMS', 'green', 'check') : visit.processing ? chip('Drafting…', 'purple', 'sparkle') : null),
+        h('h1', { class: 'visit-name' }, p.name, locked ? chip(visit.pimsResult?.manual ? 'Finalized' : 'Sent to PIMS', 'green', 'check') : visit.processing ? chip('Drafting…', 'purple', 'sparkle') : null),
         h('p', { class: 'visit-sig' }, `${visit.briefing.headline.replace(`${p.name}, `, '')} · ${visit.appointment.client.name} · ${time(visit.appointment.start)} · ${visit.appointment.provider.name}`)),
       visit.lastError ? banner('danger', `The last draft failed: ${visit.lastError}`, h('button', { class: 'linkish', onclick: () => api.redraft(visit.id).then(load) }, 'Retry')) : null,
-      locked ? banner('ok', `Sent ${relativeAgo(visit.finalizedAt)}${visit.signedBy ? ` by ${visit.signedBy}` : ''}${visit.pimsResult?.noteId ? ` as ${visit.pimsResult.noteId}` : ''}.`, h('button', { class: 'linkish', onclick: async () => { await api.reopen(visit.id); load(); } }, 'Reopen')) : null,
+      locked && visit.pimsResult?.manual ? banner('warn', h('span', {}, h('b', {}, 'Paste into Vetter. '), visit.pimsResult.message ?? ''), h('button', { class: 'linkish', onclick: async () => { try { await navigator.clipboard.writeText(await api.noteText(visit.id)); toast('Note copied'); } catch { toast('Copy failed', { tone: 'error' }); } } }, 'Copy note')) : null,
+      locked ? banner('ok', `Finalized ${relativeAgo(visit.finalizedAt)}${visit.signedBy ? ` by ${visit.signedBy}` : ''}${visit.pimsResult?.noteId && !visit.pimsResult?.manual ? ` as ${visit.pimsResult.noteId}` : ''}.`, h('button', { class: 'linkish', onclick: async () => { await api.reopen(visit.id); load(); } }, 'Reopen')) : null,
       briefCard(visit),
       locked ? null : h('div', { class: 'record-grid' }, btn('tech', 'Tech intake', 'mic', hasTech ? 'add more' : 'start here'), btn('doctor', 'Doctor exam', 'stethoscope', hasDoctor ? 'add more' : null), btn('addendum', 'Voice note', 'note', 'any time')),
       segmentsCard(visit, load),

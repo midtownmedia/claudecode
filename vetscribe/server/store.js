@@ -94,6 +94,28 @@ export class Store {
     return (await stat(p)).size;
   }
 
+  async removeAudio(visitId, segmentId, ext) {
+    await rm(this.audioPath(visitId, segmentId, ext), { force: true });
+  }
+
+  /** Deletes audio older than `days`. Transcripts and notes are kept. */
+  async sweepAudio(days) {
+    if (!days || days <= 0) return 0;
+    const cutoff = Date.now() - days * 86400000;
+    let removed = 0;
+    let visits;
+    try { visits = await readdir(join(this.dir, 'audio')); } catch { return 0; }
+    for (const v of visits) {
+      let files;
+      try { files = await readdir(join(this.dir, 'audio', v)); } catch { continue; }
+      for (const f of files) {
+        const p = join(this.dir, 'audio', v, f);
+        try { if ((await stat(p)).mtimeMs < cutoff) { await rm(p, { force: true }); removed += 1; } } catch { /* ignore */ }
+      }
+    }
+    return removed;
+  }
+
   async readAudio(visitId, segmentId, ext) {
     try { return await readFile(this.audioPath(visitId, segmentId, ext)); } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
   }

@@ -10,7 +10,7 @@ const STATUS = {
 function visitChip(v) {
   if (!v) return null;
   if (v.processing) return chip('Drafting…', 'purple', 'sparkle');
-  if (v.status === 'finalized') return chip('Sent', 'green', 'check');
+  if (v.status === 'finalized') return chip('Done', 'green', 'check');
   if (v.stage === 'doctor_exam' || v.stage === 'addendum') return chip('Draft ready', 'purple');
   if (v.stage === 'tech_intake') return chip('Intake done', 'low');
   return chip(STATUS[v.status]?.[0] ?? v.status, STATUS[v.status]?.[1] ?? '');

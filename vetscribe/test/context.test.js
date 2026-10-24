@@ -44,3 +44,11 @@ test('an empty record says so instead of guessing', () => {
   assert.match(b.text, /## Allergies and adverse reactions\n- none recorded/);
   assert.equal(b.flags.length, 0);
 });
+
+test('the briefing never carries client contact details', () => {
+  const b = buildBriefing(by('Biscuit'));
+  assert.doesNotMatch(b.text, /555-0142/);
+  assert.doesNotMatch(b.text, /maria@example\.com/);
+  assert.doesNotMatch(b.text, /Alvarez/);
+  assert.match(b.text, /## Client\nMaria; prefers text\./);
+});

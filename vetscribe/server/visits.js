@@ -14,8 +14,9 @@ const ROLES = new Set(['tech', 'doctor', 'addendum']);
 function httpError(status, message) { return Object.assign(new Error(message), { status }); }
 
 export class VisitService {
-  constructor({ store, pims, scribe, transcriber, now = () => new Date(), log = () => {} }) {
+  constructor({ store, pims, scribe, transcriber, now = () => new Date(), log = () => {}, keepAudio = true }) {
     this.store = store;
+    this.keepAudio = keepAudio;
     this.pims = pims;
     this.scribe = scribe;
     this.transcriber = transcriber;
@@ -57,10 +58,13 @@ export class VisitService {
     const appt = await this.pims.getAppointment(appointmentId, { date });
     if (!appt) throw httpError(404, 'Appointment not found');
     const t = this.now().toISOString();
+    // The visit keeps what the note and the screen need, not the client's
+    // contact details; those stay in the practice system.
+    const snapshot = { ...appt, client: { ...appt.client, phone: '', email: '' } };
     const visit = {
       id: this.store.newId(),
       appointmentId,
-      appointment: appt,
+      appointment: snapshot,
       briefing: buildBriefing(appt),
       status: 'open',
       stage: 'none',
@@ -183,7 +187,7 @@ export class VisitService {
     const v = await this.get(visitId);
     const seg = v.segments.find((s) => s.id === segmentId);
     const audio = await this.store.readAudio(visitId, segmentId, seg.ext);
-    const vocabulary = [v.appointment.patient.name, v.appointment.client.name, ...v.appointment.patient.medications.map((m) => m.name), ...v.appointment.patient.problems.map((p) => p.name)].join(', ');
+    const vocabulary = [v.appointment.patient.name, ...v.appointment.patient.medications.map((m) => m.name), ...v.appointment.patient.problems.map((p) => p.name)].join(', ');
     const r = await this.transcriber.transcribe({ audio, mime: seg.mime, liveTranscript: seg.liveTranscript, prompt: `Veterinary visit. ${vocabulary}` });
     await this.store.update('visits', visitId, (vv) => {
       const s = vv.segments.find((x) => x.id === segmentId);
@@ -191,8 +195,10 @@ export class VisitService {
       s.transcriptSource = r.source;
       s.warning = r.warning ?? null;
       s.status = r.text ? 'drafting' : 'done';
+      s.audioDeleted = !this.keepAudio && Boolean(r.text);
       vv.updatedAt = this.now().toISOString();
     });
+    if (!this.keepAudio && r.text) await this.store.removeAudio(visitId, segmentId, seg.ext);
   }
 
   async redraft(visitId, { reason = 'redraft' } = {}) {
@@ -271,6 +277,7 @@ export class VisitService {
     const result = await this.pims.postNote({
       appointmentId: v.appointmentId,
       patientId: v.appointment.patient.id,
+      clientId: v.appointment.client.id,
       signedBy,
       text,
       soap: v.soap,

@@ -19,7 +19,9 @@ export async function settingsView(app, root) {
           row('Scribe model', hlth.model),
           row('Transcription', hlth.transcriber),
           row('Practice system', hlth.pims),
-          row('Device token', hlth.authRequired ? 'required' : 'not required')),
+          row('Device token', hlth.authRequired ? 'required' : 'not required'),
+          row('Live captions', hlth.captions ? 'on (uses the phone\'s speech service)' : 'off'),
+          row('Audio', hlth.keepAudio ? 'kept on the server' : 'deleted after transcription')),
         ...hlth.warnings.map((w) => banner('warn', w)),
       );
       app.health = hlth;

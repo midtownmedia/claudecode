@@ -113,3 +113,37 @@ test('editing a transcript redrafts; bad roles are refused', async () => {
     assert.equal(cur.drafts.length, 2);
   } finally { await cleanup(); }
 });
+
+test('the visit snapshot drops client contact details, and audio can be deleted once transcribed', async () => {
+  const { visits, store, cleanup } = await testService();
+  try {
+    visits.keepAudio = false;
+    const v = await visits.open({ appointmentId: 'appt-1001', date: '2026-10-24' });
+    assert.equal(v.appointment.client.phone, '');
+    assert.equal(v.appointment.client.email, '');
+    assert.equal(v.appointment.client.name, 'Maria Alvarez');
+    const s = await visits.startSegment(v.id, { role: 'tech' });
+    await visits.appendAudio(v.id, s.id, Buffer.from('audio'));
+    await visits.finishSegment(v.id, s.id, { liveTranscript: 'Here for the annual. Weighs 39 kg.' });
+    await visits.whenIdle(v.id);
+    const cur = await visits.get(v.id);
+    assert.equal(cur.segments[0].audioDeleted, true);
+    assert.equal(await store.readAudio(v.id, s.id, 'webm'), null);
+    assert.equal(cur.segments[0].transcript, 'Here for the annual. Weighs 39 kg.');
+  } finally { await cleanup(); }
+});
+
+test('old audio is swept, transcripts stay', async () => {
+  const { visits, store, cleanup } = await testService();
+  try {
+    await store.appendAudio('old', 's', Buffer.from('x'), 'webm');
+    const { utimes } = await import('node:fs/promises');
+    const past = new Date(Date.now() - 40 * 86400000);
+    await utimes(store.audioPath('old', 's', 'webm'), past, past);
+    await store.appendAudio('new', 's', Buffer.from('y'), 'webm');
+    assert.equal(await store.sweepAudio(30), 1);
+    assert.equal(await store.readAudio('old', 's', 'webm'), null);
+    assert.ok(await store.readAudio('new', 's', 'webm'));
+    assert.equal(await store.sweepAudio(0), 0);
+  } finally { await cleanup(); }
+});

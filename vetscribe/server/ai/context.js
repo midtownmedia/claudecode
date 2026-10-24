@@ -11,6 +11,8 @@ import { ageText, sexText, toKg, toLb, weightTrend } from '../pims/normalize.js'
 
 const fmtKg = (w) => (w ? `${toKg(w).toFixed(1)} kg (${toLb(w).toFixed(1)} lb)` : 'no weight on file');
 
+const firstName = (n) => String(n ?? '').trim().split(/\s+/)[0] ?? '';
+
 function overdue(due, today) { return Boolean(due) && due < today; }
 function dueSoon(due, today, days = 30) {
   if (!due) return false;
@@ -49,7 +51,7 @@ export function buildBriefing(appt, { today } = {}) {
   for (const r of p.openRecommendations) flags.push({ kind: 'open', severity: 'low', text: `Open: ${r}` });
 
   const lines = [];
-  lines.push(`# Pre-visit briefing: ${p.name} (${appt.client.name})`);
+  lines.push(`# Pre-visit briefing: ${p.name} (owner: ${firstName(appt.client.name) || 'unknown'})`);
   lines.push(`Appointment: ${appt.type}; ${appt.durationMin} min; room ${appt.room || '?'}; ${appt.provider.name || 'provider TBD'}; tech ${appt.technician.name || 'TBD'}.`);
   lines.push(`Reason for visit (front desk): ${appt.reason || 'not recorded'}`);
   if (appt.notes) lines.push(`Booking notes: ${appt.notes}`);
@@ -84,8 +86,10 @@ export function buildBriefing(appt, { today } = {}) {
     : '- none recorded');
   lines.push('## Open recommendations (declined or never scheduled)');
   lines.push(p.openRecommendations.length ? p.openRecommendations.map((r) => `- ${r}`).join('\n') : '- none');
+  // The scribe never sees contact details: a first name is enough to write
+  // "owner reports", and the note header is filled from the record server-side.
   lines.push('## Client');
-  lines.push(`${appt.client.name}; prefers ${appt.client.preferredContact}; ${appt.client.phone || 'no phone'}${appt.client.email ? `; ${appt.client.email}` : ''}.`);
+  lines.push(`${firstName(appt.client.name) || 'Owner'}; prefers ${appt.client.preferredContact}.`);
   if (appt.client.notes) lines.push(`Client notes: ${appt.client.notes}`);
 
   const order = { high: 0, medium: 1, low: 2 };

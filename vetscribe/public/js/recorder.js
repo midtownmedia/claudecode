@@ -21,8 +21,9 @@ export function pickMime() {
 }
 
 export class Recorder {
-  constructor({ onChunk, onCaption, onLevel, onError, timeslice = 5000 }) {
+  constructor({ onChunk, onCaption, onLevel, onError, timeslice = 5000, captions = true }) {
     this.onChunk = onChunk; this.onCaption = onCaption; this.onLevel = onLevel; this.onError = onError;
+    this.captions = captions;
     this.timeslice = timeslice;
     this.active = false;
     this.finalText = '';
@@ -46,7 +47,7 @@ export class Recorder {
   }
 
   startSpeech() {
-    if (!SR) return;
+    if (!SR || !this.captions) return;
     const begin = () => {
       if (!this.active) return;
       const r = new SR();

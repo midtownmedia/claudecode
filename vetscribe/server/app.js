@@ -61,7 +61,7 @@ export async function createApp(cfg, deps = {}) {
   const model = deps.model ?? createModel(cfg);
   const scribe = deps.scribe ?? new Scribe({ model, practiceName: cfg.practiceName });
   const transcriber = deps.transcriber ?? createTranscriber(cfg);
-  const visits = deps.visits ?? new VisitService({ store, pims, scribe, transcriber, log, now: deps.now });
+  const visits = deps.visits ?? new VisitService({ store, pims, scribe, transcriber, log, now: deps.now, keepAudio: cfg.privacy?.keepAudio !== false });
 
   const routes = [];
   const route = (method, pattern, handler, opts = {}) => routes.push({ method, re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[\\w-]+)')}/?$`), handler, raw: Boolean(opts.raw) });

@@ -10,11 +10,12 @@ import { Recorder, support } from '../recorder.js';
 
 const ROLE_LABEL = { tech: 'Technician intake', doctor: 'Doctor exam', addendum: 'Voice note' };
 
-export function openBadge({ visit, role, onFinished }) {
+export function openBadge({ visit, role, onFinished, captions = true }) {
   const layer = h('div', { class: 'badge-layer', role: 'dialog', 'aria-modal': 'true', 'aria-label': ROLE_LABEL[role] });
   const timer = h('div', { class: 'badge-timer' }, '00:00');
   const level = h('div', { class: 'badge-level' }, icon('mic'));
-  const captions = h('div', { class: 'badge-captions' }, h('span', { class: 'hint' }, support.speech ? 'Listening…' : 'Recording. Live captions are not available in this browser; the server will transcribe.'));
+  const liveCaptions = captions && support.speech;
+  const captionsEl = h('div', { class: 'badge-captions' }, h('span', { class: 'hint' }, liveCaptions ? 'Listening…' : 'Recording. The server transcribes when you stop.'));
   const status = h('div', { class: 'badge-status' });
   const stopBtn = h('button', { type: 'button', class: 'btn btn-stop', onclick: () => stop() }, icon('stop'), h('span', {}, 'Stop and draft'));
   const typeBtn = h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => typeInstead() }, icon('keyboard'), h('span', {}, 'Type instead'));
@@ -24,7 +25,7 @@ export function openBadge({ visit, role, onFinished }) {
     h('div', { class: 'badge-top' },
       h('div', {}, h('div', { class: 'badge-patient' }, visit.appointment.patient.name), h('div', { class: 'badge-role' }, ROLE_LABEL[role])),
       closeBtn),
-    h('div', { class: 'badge-mid' }, timer, level, captions),
+    h('div', { class: 'badge-mid' }, timer, level, captionsEl),
     h('div', { class: 'badge-bottom' }, status, stopBtn, typeBtn),
   );
   document.body.append(layer);
@@ -35,14 +36,15 @@ export function openBadge({ visit, role, onFinished }) {
   let tick = null;
   let busy = false;
   const recorder = new Recorder({
+    captions: liveCaptions,
     onChunk: (blob) => {
       uploads = uploads.then(() => api.appendAudio(visit.id, segment.id, blob)).catch(() => { failedChunks += 1; status.textContent = `${failedChunks} chunk${failedChunks > 1 ? 's' : ''} failed to upload; captions will still be used.`; });
     },
     onCaption: ({ final, interim }) => {
-      clear(captions);
+      clear(captionsEl);
       const tail = final.slice(-400);
-      captions.append(h('span', {}, tail.length < final.length ? `…${tail}` : tail), interim ? h('span', { class: 'interim' }, ` ${interim}`) : null);
-      captions.scrollTop = captions.scrollHeight;
+      captionsEl.append(h('span', {}, tail.length < final.length ? `…${tail}` : tail), interim ? h('span', { class: 'interim' }, ` ${interim}`) : null);
+      captionsEl.scrollTop = captionsEl.scrollHeight;
     },
     onLevel: (rms) => { level.style.transform = `scale(${0.6 + Math.min(1, rms * 6) * 0.5})`; },
     onError: (e) => { status.textContent = e.message; },
@@ -95,8 +97,8 @@ export function openBadge({ visit, role, onFinished }) {
     try { if (recorder.active) await recorder.stop(); } catch { /* ignore */ }
     clearInterval(tick);
     const ta = h('textarea', { class: 'textarea', placeholder: 'Dictate with the keyboard mic, or type what was said in the room…', rows: 8 });
-    clear(captions); captions.style.maskImage = 'none'; captions.style.webkitMaskImage = 'none'; captions.style.maxHeight = 'none';
-    captions.append(reason ? h('p', { class: 'hint' }, reason) : null, ta);
+    clear(captionsEl); captionsEl.style.maskImage = 'none'; captionsEl.style.webkitMaskImage = 'none'; captionsEl.style.maxHeight = 'none';
+    captionsEl.append(reason ? h('p', { class: 'hint' }, reason) : null, ta);
     level.remove(); timer.remove();
     stopBtn.replaceWith(h('button', {
       type: 'button', class: 'btn btn-filled', onclick: async () => {
