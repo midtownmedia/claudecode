@@ -73,6 +73,7 @@ export function publicConfig(cfg) {
     transcribe: { provider: cfg.transcribe.provider },
     pims: { adapter: cfg.pims.adapter },
     authRequired: Boolean(cfg.authToken),
+    writeback: cfg.pims.adapter === 'daysmart' && cfg.pims.daysmart.noteMode === 'outbox' ? 'outbox' : 'auto',
     captions: cfg.privacy.captions,
     keepAudio: cfg.privacy.keepAudio,
     warnings: [

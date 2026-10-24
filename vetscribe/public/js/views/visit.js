@@ -212,7 +212,7 @@ export async function visitView(app, root, id) {
       soap ? evidenceCard(soap) : null,
       soap && !locked ? h('div', { class: 'btn-row' },
         button('Redraft', async () => { try { await api.redraft(visit.id); toast('Redrafting from all recordings…'); load(); } catch (e) { toast(e.message, { tone: 'error' }); } }, { kind: 'gray', iconName: 'sparkle', disabled: visit.processing }),
-        button('Send to PIMS', finalize, { kind: 'green', iconName: 'send', disabled: visit.processing })) : null,
+        button(app.health?.writeback === 'outbox' ? 'Finalize note' : 'Send to PIMS', finalize, { kind: 'green', iconName: 'send', disabled: visit.processing })) : null,
     ));
   };
 
@@ -221,12 +221,17 @@ export async function visitView(app, root, id) {
       const go = await ask({ title: 'Send the intake draft?', message: 'No doctor exam has been recorded. The note will say the doctor exam is pending.', actions: [{ label: 'Wait', value: false }, { label: 'Send anyway', value: true }] });
       if (!go) return;
     }
-    const ok = await ask({ title: 'Send this note to the practice system?', message: `It will be signed as ${app.device || 'this device'}. You can reopen it afterwards.`, actions: [{ label: 'Cancel', value: false }, { label: 'Send', value: true, style: 'bold' }] });
+    const outbox = app.health?.writeback === 'outbox';
+    const ok = await ask({
+      title: outbox ? 'Finalize this note?' : 'Send this note to the practice system?',
+      message: `It will be signed as ${app.device || 'this device'}.${outbox ? ' You then copy it into Vetter.' : ''} You can reopen it afterwards.`,
+      actions: [{ label: 'Cancel', value: false }, { label: outbox ? 'Finalize' : 'Send', value: true, style: 'bold' }],
+    });
     if (!ok) return;
     try {
       const actions = visit.soap.pims_actions.filter((_, i) => state.actions.has(i));
       visit = await api.finalize(visit.id, actions);
-      toast('Note sent');
+      toast(visit.pimsResult?.manual ? 'Finalized. Copy it into Vetter.' : 'Note sent');
       render();
     } catch (e) { toast(e.message, { tone: 'error' }); }
   };
